@@ -1,0 +1,22 @@
+# Build artifacts
+xhs-poster
+xhs-poster-bin
+
+# Runtime files
+cookies.json
+qrcode_login.png
+publish_page_debug.png
+
+# Development files
+*.zip
+*.tar.gz
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
