@@ -15,16 +15,6 @@ pipeline {
             }
         }
         
-        stage('Dependencies') {
-            steps {
-                echo 'Installing dependencies...'
-                sh '''
-                    PATH=$PATH:${GOPATH}
-                    go get
-                '''
-            }
-        }
-        
         stage('Build') {
             parallel {
                 stage('Linux Build') {
