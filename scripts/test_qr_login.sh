@@ -28,7 +28,7 @@ echo "服务器响应:"
 pretty_print "$HEALTH_RESPONSE"
 
 echo -e "\n=== 2. 检查当前登录状态 ==="
-LOGIN_STATUS=$(curl -s $API_BASE/api/v1/login/status)
+LOGIN_STATUS=$(curl -s $API_BASE/api/v1/xhs/login/status)
 echo "登录状态响应:"
 pretty_print "$LOGIN_STATUS"
 
@@ -48,7 +48,7 @@ else
     echo ""
     
     # 调用登录API
-    LOGIN_RESULT=$(curl -s -X POST $API_BASE/api/v1/login)
+    LOGIN_RESULT=$(curl -s -X POST $API_BASE/api/v1/xhs/login)
     echo "登录API响应:"
     pretty_print "$LOGIN_RESULT"
     
@@ -64,7 +64,7 @@ else
     
     # 检查登录是否成功
     echo -e "\n=== 5. 验证登录结果 ==="
-    FINAL_STATUS=$(curl -s $API_BASE/api/v1/login/status)
+    FINAL_STATUS=$(curl -s $API_BASE/api/v1/xhs/login/status)
     echo "最终登录状态:"
     pretty_print "$FINAL_STATUS"
     

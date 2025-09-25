@@ -1,295 +1,221 @@
-# XHS Poster
+# SNS Notify
 
-A web server that provides HTTP REST API for posting content to Xiaohongshu (小红书).
+一个支持多社交网络平台的内容发布工具，当前支持小红书(XHS)平台。
 
-## Features
+## 🌟 特性
 
-- **Login Status Check**: Check if you're logged into Xiaohongshu
-- **Content Publishing**: Post images and text content to Xiaohongshu
-- **HTTP REST API**: Simple and intuitive REST interface
-- **Image Processing**: Support for both URL images and local file paths
-- **Tag Support**: Add hashtags to your posts
+- 🔐 **自动登录**: 支持二维码扫码登录
+- 📝 **内容发布**: 支持图文内容发布到小红书
+- 🖼️ **图片处理**: 自动处理和优化图片
+- 🌐 **HTTP API**: 提供RESTful API接口
+- 📊 **健康检查**: 内置服务健康监控
+- 🔧 **易于扩展**: 模块化架构，易于添加新平台
 
-## Quick Start
+## 📁 项目结构
 
-### 1. Build the Project
-
-```bash
-go mod tidy
-go build -o xhs-poster .
+```
+sns-notify/
+├── cmd/sns-notify/          # 主程序入口
+├── internal/
+│   ├── config/             # 配置管理
+│   ├── logger/             # 日志系统
+│   ├── server/             # HTTP服务器
+│   ├── xhs/               # 小红书平台支持
+│   └── utils/             # 通用工具
+├── scripts/               # 构建和部署脚本
+├── docs/                 # 文档
+└── go.mod               # Go模块定义
 ```
 
-### 2. Run the Server
+## 🚀 快速开始
+
+### 使用 Makefile (推荐)
 
 ```bash
-# Run with default settings (HTTP on :6170)
-./xhs-poster
+# 查看所有可用命令
+make help
 
-# Run with custom port  
-./xhs-poster -http-port=:8080
+# 安装依赖
+make deps
 
-# Run with visible browser (for debugging)
-./xhs-poster -headless=false
+# 开发构建并运行
+make dev
+
+# 生产构建 (Linux AMD64)
+make build-linux
+
+# 运行测试
+make test
+
+# 快速启动
+make quick-start
 ```
 
-**🚀 智能自动登录**: 服务采用按需登录策略：
-1. 启动HTTP服务器
-2. 当访问需要认证的API时，自动检查登录状态
-3. 如果未登录，立即触发登录流程并显示二维码
-4. 扫码完成后，请求继续正常处理
+### 传统方式
 
-### 3. Login System
-
-The application features an intelligent login system that works in both headless and non-headless modes:
-
-#### Headless Mode Login (Recommended)
-- Automatically displays QR codes in the terminal
-- Saves QR code image to `qrcode_login.png` 
-- Shows detailed scanning instructions
-- Supports cookie persistence for automatic re-login
-
-#### Manual Browser Login
-- Run with `-headless=false` for visual browser login
-- Traditional browser-based QR code scanning
-
-#### Login Process
-1. The system first checks for saved cookies
-2. If not logged in, triggers QR code display
-3. Provides scanning instructions and saves QR image
-4. Waits for user to scan with Xiaohongshu mobile app
-5. Automatically saves login session for future use
-
-## Testing
-
-We provide comprehensive test scripts to verify the posting functionality:
-
-### Quick Test
+#### 安装依赖
 ```bash
-# Simple test script - posts a single test message
-./quick_test_post.sh
+go mod download
 ```
 
-### Comprehensive Test Suite
+#### 构建项目
 ```bash
-# Full test suite with multiple scenarios
-./test_poster.sh
+# 使用构建脚本
+./scripts/build.sh
 
-# Test only HTTP endpoints
-./test_poster.sh --http-only
-
-# Test only gRPC endpoints  
-./test_poster.sh --grpc-only
-
-# Skip optional tests
-./test_poster.sh --no-local --no-errors --no-performance
-
-# Show help
-./test_poster.sh --help
+# 或手动构建
+go build -o sns-notify ./cmd/sns-notify
 ```
 
-### Test Features
-- ✅ **HTTP & gRPC API Testing**: Tests both REST and gRPC endpoints
-- ✅ **Login Status Verification**: Ensures user is authenticated before testing
-- ✅ **Multiple Image Sources**: Tests both URL images and local files
-- ✅ **Error Handling**: Validates error responses for invalid requests
-- ✅ **Performance Metrics**: Measures API response times
-- ✅ **Unicode & Emoji Support**: Tests Chinese characters and emojis
-- ✅ **Tag System**: Tests hashtag functionality
-
-### Prerequisites for Testing
-- Server running and user logged in
-- `grpcurl` for gRPC tests (optional): `go install github.com/fullstorydev/grpcurl/cmd/grpcurl@latest`
-- `ImageMagick` for local image tests (optional): `sudo apt install imagemagick`
-
-## API Usage
-
-### Authentication System
-
-The API uses intelligent auto-login with session-based authentication. Protected endpoints automatically trigger login when needed.
-
-**Public Endpoints** (no authentication required):
-- `GET /health` - Health check
-- `GET /api/v1/login/status` - Check login status
-- `POST /api/v1/login` - Manual login (optional)
-
-**Auto-Login Endpoints** (automatically trigger login if needed):
-- `POST /api/v1/publish` - Publish content (auto-login on first access)
-
-### HTTP REST API
-
-#### Check Login Status
+#### 运行服务器
 ```bash
-curl -X GET http://localhost:8080/api/v1/login/status
+# 开发模式
+./scripts/dev.sh
+
+# 生产模式
+./sns-notify -http-port=:6170 -log-file=/var/logs/sns-notify/sns-notify.log
 ```
 
-#### Login to Xiaohongshu
+## 📖 API 文档
+
+### 健康检查
 ```bash
-# Triggers QR code login process
-curl -X POST http://localhost:8080/api/v1/login
-
-# This will:
-# 1. Display QR code instructions in the server console
-# 2. Save QR code image to qrcode_login.png
-# 3. Wait for mobile app scanning (up to 5 minutes)
-# 4. Return success/failure status
+GET /health
 ```
 
-#### Publish Content (Protected)
+### 小红书 (XHS) API
+
+#### 检查登录状态
 ```bash
-# This will fail if not logged in (returns 401)
-curl -X POST http://localhost:8080/api/v1/publish \
-  -H "Content-Type: application/json" \
-  -d '{
-    "title": "我的测试标题",
-    "content": "这是测试内容 #测试标签",
-    "images": [
-      "https://example.com/image.jpg"
-    ],
-    "tags": ["测试标签", "API"]
-  }'
+GET /api/v1/xhs/login/status
 ```
 
-#### Authentication Flow Example
+#### 手动登录
 ```bash
-# 1. Check if logged in
-curl http://localhost:8080/api/v1/login/status
-
-# 2. If not logged in, login first
-curl -X POST http://localhost:8080/api/v1/login
-
-# 3. Now you can access protected endpoints
-curl -X POST http://localhost:8080/api/v1/publish \
-  -H "Content-Type: application/json" \
-  -d '{"title": "Test", "content": "Content", "images": ["url"], "tags": []}'
+POST /api/v1/xhs/login
 ```
 
-### gRPC API
-
-See the example client in `examples/grpc_client.go`:
-
+#### 发布内容
 ```bash
-# Run the example gRPC client
-go run examples/grpc_client.go
-```
+POST /api/v1/xhs/publish
+Content-Type: application/json
 
-## API Specification
-
-### HTTP Endpoints
-
-- `GET /health` - Health check
-- `GET /api/v1/login/status` - Check login status
-- `POST /api/v1/publish` - Publish content
-
-### gRPC Methods
-
-- `CheckLoginStatus()` - Check login status
-- `PublishContent()` - Publish content
-
-### Request/Response Formats
-
-#### Publish Content Request
-```json
 {
-  "title": "Post title (max 40 characters)",
-  "content": "Post content",
-  "images": ["image_url_or_path"],
-  "tags": ["tag1", "tag2"]
+  "title": "标题",
+  "content": "内容文本",
+  "images": ["图片URL或本地路径"],
+  "tags": ["标签1", "标签2"]
 }
 ```
 
-#### Publish Content Response
-```json
-{
-  "success": true,
-  "data": {
-    "title": "Post title",
-    "content": "Post content", 
-    "images": 1,
-    "status": "发布完成"
-  },
-  "message": "发布成功"
-}
+## 🔧 配置说明
+
+### 命令行参数
+
+- `-http-port`: HTTP服务器端口，默认 `:6170`
+- `-log-file`: 日志文件路径，留空输出到控制台
+
+### 环境要求
+
+- Go 1.24+
+- Chrome/Chromium 浏览器（用于自动化）
+- 足够的磁盘空间用于图片处理
+
+## 🔐 登录流程
+
+1. 首次访问发布API时会自动触发登录
+2. 终端会显示二维码，使用小红书APP扫码登录
+3. 登录成功后cookie会自动保存，后续无需重复登录
+
+## 🛠️ 系统服务部署
+
+### 安装为系统服务
+```bash
+# 安装服务 (需要sudo权限)
+make install
+
+# 启动服务
+make service-start
+
+# 设置开机自启
+make service-enable
+
+# 查看服务状态
+make service-status
+
+# 查看服务日志
+make service-logs
 ```
 
-## Configuration
-
-### Command Line Options
-
-- `-headless`: Run browser in headless mode (default: true)
-- `-bin`: Custom browser binary path
-- `-http-port`: HTTP server port (default: :8080)
-- `-grpc-port`: gRPC server port (default: :9090)
-
-### Image Support
-
-The service supports two types of image inputs:
-
-1. **HTTP/HTTPS URLs**: Images will be downloaded automatically
-   ```json
-   ["https://example.com/image1.jpg", "https://example.com/image2.png"]
-   ```
-
-2. **Local file paths**: Direct file paths (recommended for better performance)
-   ```json
-   ["/path/to/image1.jpg", "/path/to/image2.png"]
-   ```
-
-## Notes
-
-- **Title Length**: Xiaohongshu limits titles to 40 character units (Chinese characters count as 2 units)
-- **Login Persistence**: Login cookies are automatically saved and reused
-- **Single Session**: Only one browser session per account is allowed
-- **Rate Limiting**: Be mindful of Xiaohongshu's posting limits
-
-## Architecture
-
-```
-┌─────────────────┐    ┌─────────────────┐
-│   HTTP Client   │    │   gRPC Client   │
-└─────────┬───────┘    └─────────┬───────┘
-          │                      │
-          ▼                      ▼
-┌─────────────────────────────────────────┐
-│            XHS Poster Server            │
-│  ┌─────────────┐    ┌─────────────────┐ │
-│  │ HTTP Server │    │   gRPC Server   │ │
-│  └─────────────┘    └─────────────────┘ │
-│           │                  │           │
-│           └──────────┬───────┘           │
-│                      ▼                   │
-│              ┌─────────────┐             │
-│              │ XHS Service │             │
-│              └─────────────┘             │
-│                      │                   │
-│                      ▼                   │
-│      ┌─────────────────────────────────┐ │
-│      │     Browser Automation          │ │
-│      │  (Login, Publish, etc.)         │ │
-│      └─────────────────────────────────┘ │
-└─────────────────────────────────────────┘
-                       │
-                       ▼
-              ┌─────────────────┐
-              │   Xiaohongshu   │
-              │   (小红书)       │
-              └─────────────────┘
+### 服务管理命令
+```bash
+make service-start    # 启动服务
+make service-stop     # 停止服务
+make service-restart  # 重启服务
+make service-status   # 查看状态
+make service-logs     # 查看日志
+make service-enable   # 启用开机自启
+make service-disable  # 禁用开机自启
+make uninstall        # 卸载服务
 ```
 
-## Development
-
-### Adding New Features
-
-1. Define new methods in `proto/xhs.proto`
-2. Regenerate gRPC code: `protoc --go_out=. --go-grpc_out=. proto/xhs.proto`
-3. Implement methods in both HTTP and gRPC servers
-4. Update documentation
-
-### Testing
+## 🧪 测试和验证
 
 ```bash
-# Test HTTP API
-curl -X GET http://localhost:8080/health
+# 测试API端点
+make test-api
 
-# Test gRPC API
-go run examples/grpc_client.go
+# 测试发布功能
+make test-post
+
+# 健康检查
+make health-check
+
+# 运行完整测试套件
+make test
+
+# 运行性能测试
+make test-race
+```
+
+## 📊 监控和日志
+
+- 健康检查端点: `/health`
+- 结构化日志输出
+- 支持文件和控制台日志输出
+- systemd服务日志集成
+
+## 🐳 Docker 部署
+
+参考 `docs/DOCKER_SETUP.md` 了解Docker部署详情。
+
+## 🏗️ CI/CD
+
+参考 `docs/JENKINS.md` 了解Jenkins CI/CD配置。
+
+## 🤝 扩展新平台
+
+1. 在 `internal/` 下创建新平台目录
+2. 实现平台特定的登录和发布逻辑
+3. 在 `internal/server/` 中添加相应的API路由
+4. 更新构建脚本和文档
+
+## 📄 许可证
+
+本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+
+## 🏗️ 架构图
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   HTTP Client   │────│   HTTP Server    │────│  XHS Service    │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                                │                        │
+                       ┌──────────────────┐    ┌─────────────────┐
+                       │   Logger/Config  │    │   Browser       │
+                       └──────────────────┘    └─────────────────┘
+                                                        │
+                                               ┌─────────────────┐
+                                               │  小红书网站      │
+                                               └─────────────────┘
 ```

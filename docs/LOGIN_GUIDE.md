@@ -2,7 +2,7 @@
 
 ## 概述
 
-XHS Poster 提供了智能的登录系统，支持无头模式下的二维码登录，让你可以在服务器环境中轻松完成小红书账号认证。
+SNS Notify 提供了智能的登录系统，支持无头模式下的二维码登录，让你可以在服务器环境中轻松完成小红书账号认证。
 
 ## 登录方式对比
 
@@ -18,10 +18,10 @@ XHS Poster 提供了智能的登录系统，支持无头模式下的二维码登
 **使用方法：**
 ```bash
 # 启动服务器（默认无头模式）
-./xhs-poster
+./sns-notify
 
 # 或明确指定无头模式
-./xhs-poster -headless=true
+./sns-notify -headless=true
 ```
 
 ### 🖥️ 可视化浏览器登录
@@ -34,7 +34,7 @@ XHS Poster 提供了智能的登录系统，支持无头模式下的二维码登
 **使用方法：**
 ```bash
 # 启动可视化模式
-./xhs-poster -headless=false
+./sns-notify -headless=false
 ```
 
 ## 无头模式登录详细流程

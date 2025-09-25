@@ -1,4 +1,4 @@
-package main
+package config
 
 // Config 应用配置
 type Config struct {

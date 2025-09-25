@@ -1,4 +1,4 @@
-package main
+package xhs
 
 import (
 	"context"
@@ -23,8 +23,8 @@ type PublishContent struct {
 	ImagePaths []string `json:"-"` // 处理后的图片路径
 }
 
-// XHSPublisher 小红书发布器
-type XHSPublisher struct {
+// Publisher 小红书发布器
+type Publisher struct {
 	page *rod.Page
 }
 
@@ -32,8 +32,8 @@ const (
 	publishURL = `https://creator.xiaohongshu.com/publish/publish?source=official`
 )
 
-// NewXHSPublisher 创建发布器实例
-func NewXHSPublisher(page *rod.Page) (*XHSPublisher, error) {
+// NewPublisher 创建发布器实例
+func NewPublisher(page *rod.Page) (*Publisher, error) {
 	// 设置更长的超时时间
 	pp := page.Timeout(120 * time.Second)
 
@@ -54,7 +54,7 @@ func NewXHSPublisher(page *rod.Page) (*XHSPublisher, error) {
 		slog.Info("检测到登录页面，开始登录流程", "url", currentURL)
 
 		// 在当前浏览器实例中执行登录
-		loginHandler := &XHSLogin{page: pp}
+		loginHandler := &Login{page: pp}
 		loginErr := loginHandler.Login(context.Background())
 		if loginErr != nil {
 			return nil, fmt.Errorf("发布时登录失败: %w", loginErr)
@@ -146,13 +146,13 @@ func NewXHSPublisher(page *rod.Page) (*XHSPublisher, error) {
 
 	time.Sleep(1 * time.Second)
 
-	return &XHSPublisher{
+	return &Publisher{
 		page: pp,
 	}, nil
 }
 
 // Publish 发布内容
-func (p *XHSPublisher) Publish(ctx context.Context, content PublishContent) error {
+func (p *Publisher) Publish(ctx context.Context, content PublishContent) error {
 	if len(content.ImagePaths) == 0 {
 		return errors.New("图片不能为空")
 	}
@@ -170,7 +170,7 @@ func (p *XHSPublisher) Publish(ctx context.Context, content PublishContent) erro
 	return nil
 }
 
-func (p *XHSPublisher) uploadImages(page *rod.Page, imagesPaths []string) error {
+func (p *Publisher) uploadImages(page *rod.Page, imagesPaths []string) error {
 	pp := page.Timeout(60 * time.Second) // 增加超时时间
 
 	// 验证文件路径有效性和文件大小
@@ -233,7 +233,7 @@ func (p *XHSPublisher) uploadImages(page *rod.Page, imagesPaths []string) error 
 }
 
 // waitForUploadComplete 等待并验证上传完成
-func (p *XHSPublisher) waitForUploadComplete(page *rod.Page, expectedCount int) error {
+func (p *Publisher) waitForUploadComplete(page *rod.Page, expectedCount int) error {
 	maxWaitTime := 90 * time.Second  // 增加等待时间
 	checkInterval := 1 * time.Second // 减少检查频率避免过于频繁
 	start := time.Now()
@@ -302,7 +302,7 @@ func (p *XHSPublisher) waitForUploadComplete(page *rod.Page, expectedCount int) 
 	return errors.New("上传超时，请检查网络连接和图片大小")
 }
 
-func (p *XHSPublisher) submitPublish(page *rod.Page, title, content string, tags []string) error {
+func (p *Publisher) submitPublish(page *rod.Page, title, content string, tags []string) error {
 	titleElem, err := page.Element("div.d-input input")
 	if err != nil {
 		return fmt.Errorf("查找标题输入框失败: %w", err)
@@ -341,7 +341,7 @@ func (p *XHSPublisher) submitPublish(page *rod.Page, title, content string, tags
 }
 
 // 查找内容输入框 - 使用Race方法处理两种样式
-func (p *XHSPublisher) getContentElement(page *rod.Page) (*rod.Element, bool) {
+func (p *Publisher) getContentElement(page *rod.Page) (*rod.Element, bool) {
 	var foundElement *rod.Element
 	var found bool
 
@@ -366,7 +366,7 @@ func (p *XHSPublisher) getContentElement(page *rod.Page) (*rod.Element, bool) {
 	return nil, false
 }
 
-func (p *XHSPublisher) inputTags(contentElem *rod.Element, tags []string) {
+func (p *Publisher) inputTags(contentElem *rod.Element, tags []string) {
 	if len(tags) == 0 {
 		return
 	}
@@ -393,7 +393,7 @@ func (p *XHSPublisher) inputTags(contentElem *rod.Element, tags []string) {
 	}
 }
 
-func (p *XHSPublisher) inputTag(contentElem *rod.Element, tag string) {
+func (p *Publisher) inputTag(contentElem *rod.Element, tag string) {
 	contentElem.MustInput("#")
 	time.Sleep(200 * time.Millisecond)
 
@@ -424,7 +424,7 @@ func (p *XHSPublisher) inputTag(contentElem *rod.Element, tag string) {
 	time.Sleep(500 * time.Millisecond)
 }
 
-func (p *XHSPublisher) findTextboxByPlaceholder(page *rod.Page) (*rod.Element, error) {
+func (p *Publisher) findTextboxByPlaceholder(page *rod.Page) (*rod.Element, error) {
 	elements := page.MustElements("p")
 	if elements == nil {
 		return nil, errors.New("no p elements found")
@@ -445,7 +445,7 @@ func (p *XHSPublisher) findTextboxByPlaceholder(page *rod.Page) (*rod.Element, e
 	return textboxElem, nil
 }
 
-func (p *XHSPublisher) findPlaceholderElement(elements []*rod.Element, searchText string) *rod.Element {
+func (p *Publisher) findPlaceholderElement(elements []*rod.Element, searchText string) *rod.Element {
 	for _, elem := range elements {
 		placeholder, err := elem.Attribute("data-placeholder")
 		if err != nil || placeholder == nil {
@@ -459,7 +459,7 @@ func (p *XHSPublisher) findPlaceholderElement(elements []*rod.Element, searchTex
 	return nil
 }
 
-func (p *XHSPublisher) findTextboxParent(elem *rod.Element) *rod.Element {
+func (p *Publisher) findTextboxParent(elem *rod.Element) *rod.Element {
 	currentElem := elem
 	for i := 0; i < 5; i++ {
 		parent, err := currentElem.Parent()

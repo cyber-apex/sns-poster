@@ -1,6 +1,6 @@
-# Jenkins CI/CD Setup for XHS Poster
+# Jenkins CI/CD Setup for SNS Notify
 
-This document explains how to set up Jenkins CI/CD for the XHS Poster project.
+This document explains how to set up Jenkins CI/CD for the SNS Notify project.
 
 ## Prerequisites
 
@@ -102,13 +102,13 @@ After successful builds, these artifacts are available:
 
 ```
 📁 Archived Artifacts
-├── xhs-poster-linux-amd64           # Linux binary
-├── xhs-poster-windows-amd64.exe     # Windows binary
-├── xhs-poster-darwin-amd64          # macOS binary
+├── sns-notify-linux-amd64           # Linux binary
+├── sns-notify-windows-amd64.exe     # Windows binary
+├── sns-notify-darwin-amd64          # macOS binary
 ├── release/
-│   ├── xhs-poster-linux-amd64.tar.gz
-│   ├── xhs-poster-windows-amd64.zip
-│   └── xhs-poster-darwin-amd64.tar.gz
+│   ├── sns-notify-linux-amd64.tar.gz
+│   ├── sns-notify-windows-amd64.zip
+│   └── sns-notify-darwin-amd64.tar.gz
 ├── coverage.html                    # Coverage report
 └── gosec-report.json               # Security scan report
 ```

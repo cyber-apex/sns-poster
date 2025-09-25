@@ -1,4 +1,4 @@
-module xhs-poster
+module sns-notify
 
 go 1.24.0
 

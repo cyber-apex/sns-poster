@@ -1,0 +1,45 @@
+[Unit]
+Description=SNS Notify API Service - Multi-platform Social Media Publishing
+Documentation=https://github.com/yourusername/sns-notify
+After=network.target multi-user.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Working directory
+WorkingDirectory=/opt/sns-notify
+
+# Binary path
+ExecStart=/opt/sns-notify/sns-notify -http-port=:6170 -log-file=/var/logs/sns-notify/sns-notify.log
+
+# Restart policy
+Restart=on-failure
+RestartSec=5s
+RestartPreventExitStatus=1
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/logs/sns-notify /opt/sns-notify /tmp
+
+# Environment
+Environment=DISPLAY=:0
+Environment=CHROME_DEVEL_SANDBOX=/usr/lib/chromium/chrome-sandbox
+
+# Health check
+ExecReload=/bin/kill -HUP $MAINPID
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target
+Alias=sns-notify.service

@@ -1,6 +1,8 @@
-package main
+package utils
 
 import (
+	"sns-notify/internal/config"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/sirupsen/logrus"
@@ -53,7 +55,7 @@ func (b *Browser) Close() {
 }
 
 // NewBrowser 创建浏览器实例（硬编码配置）
-func NewBrowser(config *Config) *Browser {
+func NewBrowser(cfg *config.Config) *Browser {
 	// 硬编码使用管理器模式
 	l := launcher.MustNewManaged("")
 	// Launch with headful mode

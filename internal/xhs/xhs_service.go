@@ -1,26 +1,29 @@
-package main
+package xhs
 
 import (
 	"context"
 	"fmt"
 	"time"
 
+	"sns-notify/internal/config"
+	"sns-notify/internal/utils"
+
 	"github.com/mattn/go-runewidth"
 	"github.com/sirupsen/logrus"
 )
 
-// XHSService 小红书服务
-type XHSService struct {
-	config  *Config
-	browser *Browser
+// Service 小红书服务
+type Service struct {
+	config  *config.Config
+	browser *utils.Browser
 }
 
-// NewXHSService 创建小红书服务
-func NewXHSService(config *Config) *XHSService {
-	InitConfig(config)
-	return &XHSService{
-		config:  config,
-		browser: NewBrowser(config), // 创建持久的浏览器实例
+// NewService 创建小红书服务
+func NewService(cfg *config.Config) *Service {
+	config.InitConfig(cfg)
+	return &Service{
+		config:  cfg,
+		browser: utils.NewBrowser(cfg), // 创建持久的浏览器实例
 	}
 }
 
@@ -45,11 +48,11 @@ type PublishResponse struct {
 }
 
 // CheckLoginStatus 检查登录状态
-func (s *XHSService) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, error) {
+func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, error) {
 	page := s.browser.NewPage()
 	defer page.Close()
 
-	loginAction := NewXHSLogin(page)
+	loginAction := NewLogin(page)
 
 	isLoggedIn, err := loginAction.CheckLoginStatus(ctx)
 	if err != nil {
@@ -65,11 +68,11 @@ func (s *XHSService) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse
 }
 
 // Login 登录到小红书
-func (s *XHSService) Login(ctx context.Context) (*LoginResponse, error) {
+func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 	page := s.browser.NewPage()
 	defer page.Close()
 
-	loginAction := NewXHSLogin(page)
+	loginAction := NewLogin(page)
 
 	err := loginAction.Login(ctx)
 	if err != nil {
@@ -88,7 +91,7 @@ func (s *XHSService) Login(ctx context.Context) (*LoginResponse, error) {
 }
 
 // Close 关闭服务和浏览器
-func (s *XHSService) Close() {
+func (s *Service) Close() {
 	if s.browser != nil {
 		logrus.Info("正在关闭浏览器实例...")
 		// 使用goroutine和超时来避免无限等待
@@ -114,7 +117,7 @@ func (s *XHSService) Close() {
 }
 
 // PublishContent 发布内容
-func (s *XHSService) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
+func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
 	// 验证标题长度 - 小红书限制：最大40个单位长度
 	// 中文/日文/韩文占2个单位，英文/数字占1个单位
 	if titleWidth := runewidth.StringWidth(req.Title); titleWidth > 40 {
@@ -146,13 +149,13 @@ func (s *XHSService) PublishContent(ctx context.Context, req *PublishContent) (*
 }
 
 // processImages 处理图片列表，支持URL下载和本地路径
-func (s *XHSService) processImages(images []string) ([]string, error) {
-	processor := NewImageProcessor()
+func (s *Service) processImages(images []string) ([]string, error) {
+	processor := utils.NewImageProcessor()
 	return processor.ProcessImages(images)
 }
 
 // publishContent 执行内容发布
-func (s *XHSService) publishContent(ctx context.Context, content PublishContent) error {
+func (s *Service) publishContent(ctx context.Context, content PublishContent) error {
 	// 为发布操作创建更长的超时上下文（5分钟）
 	publishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
@@ -160,7 +163,7 @@ func (s *XHSService) publishContent(ctx context.Context, content PublishContent)
 	page := s.browser.NewPage()
 	defer page.Close()
 
-	publisher, err := NewXHSPublisher(page)
+	publisher, err := NewPublisher(page)
 	if err != nil {
 		return fmt.Errorf("创建发布器失败: %w", err)
 	}

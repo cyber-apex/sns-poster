@@ -29,10 +29,10 @@ TEST_DATA='{
     "tags": ["快速测试", "API", "自动化"]
 }'
 
-echo "   📤 Making POST request to /api/v1/publish..."
+echo "   📤 Making POST request to /api/v1/xhs/publish..."
 echo "   ⏳ This may take time if login is required (check server logs for QR code)"
 
-RESPONSE=$(curl -s -X POST "$API_BASE/api/v1/publish" \
+RESPONSE=$(curl -s -X POST "$API_BASE/api/v1/xhs/publish" \
     -H "Content-Type: application/json" \
     -d "$TEST_DATA")
 

@@ -1,10 +1,10 @@
 # Docker环境设置指南 - 共享目录方案
 
-本文档介绍如何在Docker环境中运行XHS Poster，使用共享目录挂载方式上传图片。
+本文档介绍如何在Docker环境中运行SNS Notify，使用共享目录挂载方式上传图片。
 
 ## 概述
 
-XHS Poster 使用 Rod Manager 在Docker容器中运行浏览器。共享目录方案的优势：
+SNS Notify 使用 Rod Manager 在Docker容器中运行浏览器。共享目录方案的优势：
 
 - ✅ **传统文件上传**：使用标准的文件路径方式
 - ✅ **稳定可靠**：基于成熟的Docker卷挂载技术
@@ -16,7 +16,7 @@ XHS Poster 使用 Rod Manager 在Docker容器中运行浏览器。共享目录�
 ### 共享目录上传流程
 
 1. **临时目录创建**：
-   - 在宿主机创建 `/tmp/xhs-poster` 目录
+   - 在宿主机创建 `/tmp/sns-notify` 目录
    - Docker挂载该目录到容器相同路径
 
 2. **图片处理**：
@@ -25,7 +25,7 @@ XHS Poster 使用 Rod Manager 在Docker容器中运行浏览器。共享目录�
    - 验证图片格式和大小
 
 3. **路径转换**：
-   - 确保图片在 `/tmp/xhs-poster` 目录下
+   - 确保图片在 `/tmp/sns-notify` 目录下
    - 容器内可以直接访问相同路径
 
 4. **文件上传**：
@@ -67,10 +67,10 @@ ls -la /tmp/xhs-poster
 curl http://localhost:7317
 ```
 
-### 3. 启动XHS Poster
+### 3. 启动SNS Notify
 
 ```bash
-./xhs-poster -http-port :6170
+./sns-notify -http-port :6170
 ```
 
 ### 4. 测试上传功能

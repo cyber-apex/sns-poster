@@ -9,6 +9,11 @@ import (
 	"syscall"
 	"time"
 
+	"sns-notify/internal/config"
+	"sns-notify/internal/logger"
+	"sns-notify/internal/server"
+	"sns-notify/internal/xhs"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,18 +30,18 @@ func main() {
 	flag.Parse()
 
 	// 设置全局日志记录器
-	if err := SetupGlobalLogger(logFile); err != nil {
+	if err := logger.SetupGlobalLogger(logFile); err != nil {
 		log.Fatalf("初始化日志系统失败: %v", err)
 	}
 
 	// 初始化配置
-	config := &Config{}
+	cfg := &config.Config{}
 
 	// 延迟初始化小红书服务，避免rod在flag.Parse()之前注册标志
-	xhsService := initializeServices(config)
+	xhsService := initializeServices(cfg)
 
 	// 创建HTTP服务器
-	httpServer := NewHTTPServer(xhsService)
+	httpServer := server.NewHTTPServer(xhsService)
 
 	// 设置信号处理
 	quit := make(chan os.Signal, 1)
@@ -65,14 +70,14 @@ func main() {
 }
 
 // initializeServices 初始化所有服务（在flag.Parse()之后调用）
-func initializeServices(config *Config) *XHSService {
+func initializeServices(cfg *config.Config) *xhs.Service {
 	// 初始化小红书服务
-	xhsService := NewXHSService(config)
+	xhsService := xhs.NewService(cfg)
 	return xhsService
 }
 
 // gracefulShutdown 优雅关闭HTTP服务器
-func gracefulShutdown(httpServer *HTTPServer, xhsService *XHSService) {
+func gracefulShutdown(httpServer *server.HTTPServer, xhsService *xhs.Service) {
 	logrus.Info("开始优雅关闭服务器...")
 
 	// 设置关闭超时
@@ -97,18 +102,18 @@ func gracefulShutdown(httpServer *HTTPServer, xhsService *XHSService) {
 // logServerStartupInfo 显示服务器启动信息
 func logServerStartupInfo() {
 	logrus.Info("========================================")
-	logrus.Info("🚀 XHS Poster HTTP服务已启动")
+	logrus.Info("🚀 SNS Notify HTTP服务已启动")
 	logrus.Info("========================================")
 	logrus.Info("📡 HTTP API: http://localhost:6170")
 	logrus.Info("🏥 健康检查: http://localhost:6170/health")
 	logrus.Info("")
 	logrus.Info("📝 API端点:")
-	logrus.Info("  • GET  /api/v1/login/status - 检查登录状态")
-	logrus.Info("  • POST /api/v1/login - 手动登录")
-	logrus.Info("  • POST /api/v1/publish - 发布内容 (需要登录)")
+	logrus.Info("  • GET  /api/v1/xhs/login/status - 检查XHS登录状态")
+	logrus.Info("  • POST /api/v1/xhs/login - XHS手动登录")
+	logrus.Info("  • POST /api/v1/xhs/publish - XHS发布内容 (需要登录)")
 	logrus.Info("")
 	logrus.Info("🔐 自动登录:")
-	logrus.Info("  访问 /api/v1/publish 将自动触发登录流程")
+	logrus.Info("  访问 /api/v1/xhs/publish 将自动触发登录流程")
 	logrus.Info("  首次访问时会在终端显示二维码供扫码登录")
 	logrus.Info("")
 	logrus.Info("🧪 测试脚本:")

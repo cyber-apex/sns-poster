@@ -1,4 +1,4 @@
-package main
+package xhs
 
 import (
 	"context"
@@ -7,24 +7,26 @@ import (
 	"strings"
 	"time"
 
+	"sns-notify/internal/utils"
+
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
-// XHSLogin 小红书登录处理
-type XHSLogin struct {
+// Login 小红书登录处理
+type Login struct {
 	page *rod.Page
 }
 
-// NewXHSLogin 创建登录处理实例
-func NewXHSLogin(page *rod.Page) *XHSLogin {
-	return &XHSLogin{page: page}
+// NewLogin 创建登录处理实例
+func NewLogin(page *rod.Page) *Login {
+	return &Login{page: page}
 }
 
 // CheckLoginStatus 检查登录状态
-func (l *XHSLogin) CheckLoginStatus(ctx context.Context) (bool, error) {
+func (l *Login) CheckLoginStatus(ctx context.Context) (bool, error) {
 	pp := l.page.Context(ctx)
 
 	// Cookie已经在Browser.NewPage()中自动加载
@@ -46,7 +48,7 @@ func (l *XHSLogin) CheckLoginStatus(ctx context.Context) (bool, error) {
 }
 
 // Login 登录到小红书
-func (l *XHSLogin) Login(ctx context.Context) error {
+func (l *Login) Login(ctx context.Context) error {
 	pp := l.page.Context(ctx)
 
 	// Cookie已经在Browser.NewPage()中自动加载
@@ -60,7 +62,7 @@ func (l *XHSLogin) Login(ctx context.Context) error {
 	// 检查是否已经登录
 	if exists, _, _ := pp.Has(".main-container .user .link-wrapper .channel"); exists {
 		// 已经登录，保存cookies
-		cookieManager := NewCookieManager()
+		cookieManager := utils.NewCookieManager()
 		if err := cookieManager.SaveCookies(pp); err != nil {
 			logrus.Warnf("保存cookies失败: %v", err)
 		}
@@ -86,7 +88,7 @@ func (l *XHSLogin) Login(ctx context.Context) error {
 	}
 
 	// 保存cookies
-	cookieManager := NewCookieManager()
+	cookieManager := utils.NewCookieManager()
 	if err := cookieManager.SaveCookies(pp); err != nil {
 		logrus.Warnf("保存cookies失败: %v", err)
 	}
@@ -96,7 +98,7 @@ func (l *XHSLogin) Login(ctx context.Context) error {
 }
 
 // triggerLoginQRCode 触发二维码显示
-func (l *XHSLogin) triggerLoginQRCode(page *rod.Page) error {
+func (l *Login) triggerLoginQRCode(page *rod.Page) error {
 	// 首先尝试直接导航到登录页面（更可靠的方法）
 	logrus.Info("直接导航到登录页面...")
 	page.MustNavigate("https://www.xiaohongshu.com/login").MustWaitLoad()
@@ -163,8 +165,8 @@ func (l *XHSLogin) triggerLoginQRCode(page *rod.Page) error {
 }
 
 // waitAndDisplayQRCode 等待并显示二维码
-func (l *XHSLogin) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error {
-	qrDisplay := NewQRCodeDisplay()
+func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error {
+	qrDisplay := utils.NewQRCodeDisplay()
 	// 设置较小的二维码尺寸，节省终端空间
 	qrDisplay.SetSize(4, 1) // 缩小到1/4，每个像素用1个字符
 
@@ -306,7 +308,8 @@ func (l *XHSLogin) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) err
 		if err := qrDisplay.DisplayQRCode(dataURL); err != nil {
 			logrus.Warnf("显示二维码失败: %v", err)
 			// 回退到基本说明
-			qrDisplay.printQRCodeInstructions(dataURL)
+			// 回退到基本说明，输出简单的图片URL提示
+			logrus.Infof("二维码图片URL: %s", dataURL[:min(100, len(dataURL))]+"...")
 		}
 	} else {
 		logrus.Infof("获取到二维码src: %s", (*src)[:min(100, len(*src))])
@@ -335,7 +338,7 @@ func min(a, b int) int {
 }
 
 // waitForLoginSuccess 等待登录成功
-func (l *XHSLogin) waitForLoginSuccess(page *rod.Page, ctx context.Context) error {
+func (l *Login) waitForLoginSuccess(page *rod.Page, ctx context.Context) error {
 	logrus.Info("等待用户扫码登录...")
 
 	// 等待登录成功的元素出现，最多等待5分钟

@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"context"
@@ -8,19 +8,21 @@ import (
 	"syscall"
 	"time"
 
+	"sns-notify/internal/xhs"
+
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 )
 
 // HTTPServer HTTP服务器
 type HTTPServer struct {
-	xhsService *XHSService
+	xhsService *xhs.Service
 	router     *gin.Engine
 	server     *http.Server
 }
 
 // NewHTTPServer 创建HTTP服务器
-func NewHTTPServer(xhsService *XHSService) *HTTPServer {
+func NewHTTPServer(xhsService *xhs.Service) *HTTPServer {
 	return &HTTPServer{
 		xhsService: xhsService,
 	}
@@ -109,15 +111,28 @@ func (s *HTTPServer) setupRoutes() *gin.Engine {
 	// API 路由组
 	api := router.Group("/api/v1")
 	{
-		// 公开路由 - 不需要认证
-		api.GET("/login/status", s.checkLoginStatusHandler)
-		api.POST("/login", s.loginHandler) // 保留手动登录选项
-
-		// 受保护的路由 - 自动触发登录
-		protected := api.Group("/")
-		protected.Use(s.authMiddleware())
+		// XHS (小红书) 相关路由
+		xhs := api.Group("/xhs")
 		{
-			protected.POST("/publish", s.publishHandler)
+			// 公开路由 - 不需要认证
+			xhs.GET("/login/status", s.checkXHSLoginStatusHandler)
+			xhs.POST("/login", s.xhsLoginHandler)
+
+			// 受保护的路由 - 自动触发登录
+			protected := xhs.Group("/")
+			protected.Use(s.xhsAuthMiddleware())
+			{
+				protected.POST("/publish", s.xhsPublishHandler)
+			}
+		}
+
+		// 保留旧的路由做兼容（可选）
+		api.GET("/login/status", s.checkXHSLoginStatusHandler)
+		api.POST("/login", s.xhsLoginHandler)
+		protected := api.Group("/")
+		protected.Use(s.xhsAuthMiddleware())
+		{
+			protected.POST("/publish", s.xhsPublishHandler)
 		}
 	}
 
@@ -196,27 +211,27 @@ func (s *HTTPServer) respondSuccess(c *gin.Context, data any, message string) {
 	c.JSON(http.StatusOK, response)
 }
 
-// authMiddleware 认证中间件 - 自动触发登录
-func (s *HTTPServer) authMiddleware() gin.HandlerFunc {
+// xhsAuthMiddleware XHS认证中间件 - 自动触发登录
+func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 检查登录状态
+		// 检查XHS登录状态
 		status, err := s.xhsService.CheckLoginStatus(c.Request.Context())
 		if err != nil {
-			s.respondError(c, http.StatusInternalServerError, "AUTH_CHECK_FAILED",
-				"无法验证登录状态", err.Error())
+			s.respondError(c, http.StatusInternalServerError, "XHS_AUTH_CHECK_FAILED",
+				"无法验证XHS登录状态", err.Error())
 			c.Abort()
 			return
 		}
 
 		if !status.IsLoggedIn {
-			logrus.Info("用户未登录，发布器将在需要时处理登录流程")
+			logrus.Info("XHS用户未登录，发布器将在需要时处理登录流程")
 			// 不在中间件中强制登录，让发布器根据实际情况处理
 			// 这样可以确保登录和发布在同一个浏览器会话中进行
 		}
 
 		// 将用户信息存储在上下文中
-		c.Set("username", status.Username)
-		c.Set("is_logged_in", status.IsLoggedIn)
+		c.Set("xhs_username", status.Username)
+		c.Set("xhs_is_logged_in", status.IsLoggedIn)
 		c.Next()
 	}
 }
@@ -225,62 +240,62 @@ func (s *HTTPServer) authMiddleware() gin.HandlerFunc {
 func (s *HTTPServer) healthHandler(c *gin.Context) {
 	s.respondSuccess(c, map[string]any{
 		"status":    "healthy",
-		"service":   "xhs-poster",
+		"service":   "sns-notify",
 		"timestamp": time.Now().Unix(),
 	}, "服务正常")
 }
 
-// checkLoginStatusHandler 检查登录状态
-func (s *HTTPServer) checkLoginStatusHandler(c *gin.Context) {
+// checkXHSLoginStatusHandler 检查XHS登录状态
+func (s *HTTPServer) checkXHSLoginStatusHandler(c *gin.Context) {
 	status, err := s.xhsService.CheckLoginStatus(c.Request.Context())
 	if err != nil {
-		s.respondError(c, http.StatusInternalServerError, "STATUS_CHECK_FAILED",
-			"检查登录状态失败", err.Error())
+		s.respondError(c, http.StatusInternalServerError, "XHS_STATUS_CHECK_FAILED",
+			"检查XHS登录状态失败", err.Error())
 		return
 	}
 
-	s.respondSuccess(c, status, "检查登录状态成功")
+	s.respondSuccess(c, status, "检查XHS登录状态成功")
 }
 
-// loginHandler 登录处理
-func (s *HTTPServer) loginHandler(c *gin.Context) {
+// xhsLoginHandler XHS登录处理
+func (s *HTTPServer) xhsLoginHandler(c *gin.Context) {
 	result, err := s.xhsService.Login(c.Request.Context())
 	if err != nil {
-		s.respondError(c, http.StatusInternalServerError, "LOGIN_FAILED",
-			"登录失败", err.Error())
+		s.respondError(c, http.StatusInternalServerError, "XHS_LOGIN_FAILED",
+			"XHS登录失败", err.Error())
 		return
 	}
 
 	if !result.Success {
-		s.respondError(c, http.StatusBadRequest, "LOGIN_FAILED",
+		s.respondError(c, http.StatusBadRequest, "XHS_LOGIN_FAILED",
 			result.Message, nil)
 		return
 	}
 
-	s.respondSuccess(c, result, "登录成功")
+	s.respondSuccess(c, result, "XHS登录成功")
 }
 
-// publishHandler 发布内容
-func (s *HTTPServer) publishHandler(c *gin.Context) {
-	var req PublishContent
+// xhsPublishHandler XHS发布内容
+func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
+	var req xhs.PublishContent
 	if err := c.ShouldBindJSON(&req); err != nil {
 		s.respondError(c, http.StatusBadRequest, "INVALID_REQUEST",
 			"请求参数错误", err.Error())
 		return
 	}
 
-	// 从上下文获取用户信息
-	username, _ := c.Get("username")
-	logrus.Infof("用户 %v 请求发布内容: %s", username, req.Title)
+	// 从上下文获取XHS用户信息
+	username, _ := c.Get("xhs_username")
+	logrus.Infof("XHS用户 %v 请求发布内容: %s", username, req.Title)
 
-	// 执行发布
+	// 执行XHS发布
 	result, err := s.xhsService.PublishContent(c.Request.Context(), &req)
 	if err != nil {
-		s.respondError(c, http.StatusInternalServerError, "PUBLISH_FAILED",
-			"发布失败", err.Error())
+		s.respondError(c, http.StatusInternalServerError, "XHS_PUBLISH_FAILED",
+			"XHS发布失败", err.Error())
 		return
 	}
 
-	logrus.Infof("用户 %v 发布内容成功: %s", username, req.Title)
-	s.respondSuccess(c, result, "发布成功")
+	logrus.Infof("XHS用户 %v 发布内容成功: %s", username, req.Title)
+	s.respondSuccess(c, result, "XHS发布成功")
 }
