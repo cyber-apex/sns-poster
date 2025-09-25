@@ -92,14 +92,14 @@ func (s *HTTPServer) Shutdown(ctx context.Context) error {
 func (s *HTTPServer) setupRoutes() *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 
-	// 设置gin使用logrus的输出目标
+	// 设置gin使用logrus的输出
 	gin.DefaultWriter = logrus.StandardLogger().Out
 	gin.DefaultErrorWriter = logrus.StandardLogger().Out
 
 	router := gin.New()
 
-	// 使用gin的默认logger中间件，它会写入到logrus的输出
-	router.Use(gin.Logger())
+	// 使用自定义的logrus中间件
+	router.Use(s.ginLogrusMiddleware())
 	router.Use(gin.Recovery())
 	router.Use(s.corsMiddleware())
 
@@ -122,6 +122,24 @@ func (s *HTTPServer) setupRoutes() *gin.Engine {
 	}
 
 	return router
+}
+
+// ginLogrusMiddleware 使用logrus的gin日志中间件
+func (s *HTTPServer) ginLogrusMiddleware() gin.HandlerFunc {
+	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
+		// 记录HTTP请求到logrus
+		logrus.WithFields(logrus.Fields{
+			"status":     param.StatusCode,
+			"method":     param.Method,
+			"path":       param.Path,
+			"ip":         param.ClientIP,
+			"user_agent": param.Request.UserAgent(),
+			"latency":    param.Latency,
+		}).Info("HTTP请求")
+
+		// 返回空字符串，因为我们已经通过logrus记录了
+		return ""
+	})
 }
 
 // corsMiddleware CORS中间件
