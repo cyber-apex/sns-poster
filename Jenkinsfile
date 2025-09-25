@@ -4,6 +4,7 @@ pipeline {
     environment {
         PROJECT_NAME = 'xhs-poster'
         BINARY_NAME = 'xhs-poster'
+        SERVICE_NAME = 'xhs-poster.service'
         // Use workspace subdirectory for Go modules and cache
         GOCACHE = "${env.WORKSPACE}/.gocache"
         GOMODCACHE = "${env.WORKSPACE}/.gomodcache"
@@ -67,6 +68,17 @@ pipeline {
                     # Verify the binary
                     file ${BINARY_NAME}-linux-amd64
                     ls -la ${BINARY_NAME}-linux-amd64
+                '''
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                echo 'Deploying...'
+                sh '''
+                    systemctl restart ${SERVICE_NAME}
+                    sleep 10
+                    systemctl status ${SERVICE_NAME}
                 '''
             }
         }
