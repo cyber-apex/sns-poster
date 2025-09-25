@@ -62,7 +62,7 @@ pipeline {
                     go version
                     go env
                     
-                    go build -v -o ${BINARY_NAME}-linux-amd64 .
+                    go build -o ${BINARY_NAME}-linux-amd64 .
                     
                     # Verify the binary
                     file ${BINARY_NAME}-linux-amd64
@@ -73,24 +73,6 @@ pipeline {
     }
     
     post {
-        always {
-            echo 'Cleaning up...'
-            
-            // Archive build artifacts
-            archiveArtifacts artifacts: 'release/*', fingerprint: true, allowEmptyArchive: true
-            archiveArtifacts artifacts: '${BINARY_NAME}-*', fingerprint: true, allowEmptyArchive: true
-            
-            // Clean workspace
-            sh '''
-                # Kill any remaining processes
-                pkill -f xhs-poster || true
-                
-                # Clean build artifacts from workspace (but keep archived ones)
-                rm -f ${BINARY_NAME}-*
-                rm -rf release/
-            '''
-        }
-        
         success {
             echo '✅ Pipeline completed successfully!'
             
