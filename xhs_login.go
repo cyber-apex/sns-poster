@@ -15,12 +15,18 @@ import (
 
 // XHSLogin 小红书登录处理
 type XHSLogin struct {
-	page *rod.Page
+	page       *rod.Page
+	qrCallback func(string) // QR码回调函数
 }
 
 // NewXHSLogin 创建登录处理实例
 func NewXHSLogin(page *rod.Page) *XHSLogin {
 	return &XHSLogin{page: page}
+}
+
+// SetQRCallback 设置QR码回调函数
+func (l *XHSLogin) SetQRCallback(callback func(string)) {
+	l.qrCallback = callback
 }
 
 // CheckLoginStatus 检查登录状态
@@ -302,17 +308,29 @@ func (l *XHSLogin) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) err
 
 		logrus.Infof("二维码截图转换为data URL，大小: %d bytes", len(base64Data))
 
-		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(dataURL); err != nil {
-			logrus.Warnf("显示二维码失败: %v", err)
-			// 回退到基本说明
-			qrDisplay.printQRCodeInstructions(dataURL)
+		// 使用新的Web界面显示二维码
+		if l.qrCallback != nil {
+			l.qrCallback(dataURL)
+			logrus.Info("二维码已发送到Web界面，请在浏览器中查看")
+		} else {
+			// 回退到原有的终端显示方式
+			if err := qrDisplay.DisplayQRCode(dataURL); err != nil {
+				logrus.Warnf("显示二维码失败: %v", err)
+				// 回退到基本说明
+				qrDisplay.printQRCodeInstructions(dataURL)
+			}
 		}
 	} else {
 		logrus.Infof("获取到二维码src: %s", (*src)[:min(100, len(*src))])
-		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(*src); err != nil {
-			logrus.Warnf("显示二维码失败: %v", err)
+		// 使用新的Web界面显示二维码
+		if l.qrCallback != nil {
+			l.qrCallback(*src)
+			logrus.Info("二维码已发送到Web界面，请在浏览器中查看")
+		} else {
+			// 回退到原有的终端显示方式
+			if err := qrDisplay.DisplayQRCode(*src); err != nil {
+				logrus.Warnf("显示二维码失败: %v", err)
+			}
 		}
 
 		// 如果是data URL，也保存到文件

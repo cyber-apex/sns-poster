@@ -53,6 +53,7 @@ func CreateCustomLogger(logFile string) (*logrus.Logger, error) {
 		// 打开或创建日志文件
 		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
+			defer file.Close()
 			return nil, err
 		}
 
@@ -83,15 +84,10 @@ func SetupGlobalLogger(logFile string) error {
 		return nil
 	}
 
-	// 确保日志目录存在
-	dir := filepath.Dir(logFile)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
-	}
-
 	// 打开或创建日志文件
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
+		defer file.Close()
 		return err
 	}
 
