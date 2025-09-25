@@ -44,8 +44,8 @@ func main() {
 
 	// 启动HTTP服务器
 	go func() {
-		log.Printf("启动HTTP服务器在端口 %s", httpPort)
-		if err := httpServer.Start(httpPort); err != nil {
+		logrus.Infof("启动HTTP服务器在端口 %s", httpPort)
+		if err := httpServer.StartWithoutSignalHandling(httpPort); err != nil {
 			logrus.Errorf("HTTP服务器启动失败: %v", err)
 		}
 	}()
