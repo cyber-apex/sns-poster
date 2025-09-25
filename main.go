@@ -15,9 +15,16 @@ import (
 func main() {
 	var (
 		httpPort string
+		logFile  string
 	)
 	flag.StringVar(&httpPort, "http-port", ":6170", "HTTP服务器端口")
+	flag.StringVar(&logFile, "log-file", "", "日志文件路径 (留空则输出到控制台)")
 	flag.Parse()
+
+	// 设置全局日志记录器
+	if err := SetupGlobalLogger(logFile); err != nil {
+		log.Fatalf("初始化日志系统失败: %v", err)
+	}
 
 	// 初始化配置
 	config := &Config{}
