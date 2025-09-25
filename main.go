@@ -13,12 +13,15 @@ import (
 )
 
 func main() {
+	// 首先定义和解析所有命令行参数
 	var (
 		httpPort string
 		logFile  string
 	)
 	flag.StringVar(&httpPort, "http-port", ":6170", "HTTP服务器端口")
 	flag.StringVar(&logFile, "log-file", "", "日志文件路径 (留空则输出到控制台)")
+
+	// 立即解析标志，避免与rod的标志冲突
 	flag.Parse()
 
 	// 设置全局日志记录器
@@ -29,8 +32,8 @@ func main() {
 	// 初始化配置
 	config := &Config{}
 
-	// 初始化小红书服务
-	xhsService := NewXHSService(config)
+	// 延迟初始化小红书服务，避免rod在flag.Parse()之前注册标志
+	xhsService := initializeServices(config)
 
 	// 创建HTTP服务器
 	httpServer := NewHTTPServer(xhsService)
@@ -59,6 +62,13 @@ func main() {
 
 	// 开始优雅关闭
 	gracefulShutdown(httpServer, xhsService)
+}
+
+// initializeServices 初始化所有服务（在flag.Parse()之后调用）
+func initializeServices(config *Config) *XHSService {
+	// 初始化小红书服务
+	xhsService := NewXHSService(config)
+	return xhsService
 }
 
 // gracefulShutdown 优雅关闭HTTP服务器
