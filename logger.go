@@ -3,7 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -33,26 +32,35 @@ func DefaultLogConfig() *LogConfig {
 func CreateCustomLogger(logFile string) (*logrus.Logger, error) {
 	logger := logrus.New()
 
-	// 设置默认格式
-	logger.SetFormatter(&logrus.TextFormatter{
-		FullTimestamp:   true,
-		TimestampFormat: "2006-01-02 15:04:05",
-	})
-
 	// 设置默认级别
 	logger.SetLevel(logrus.InfoLevel)
 
 	if logFile == "" {
-		// 如果没有指定文件，输出到控制台
+		// 如果没有指定文件，输出到控制台 - 使用文本格式
+		logger.SetFormatter(&logrus.TextFormatter{
+			FullTimestamp:   true,
+			TimestampFormat: "2006-01-02 15:04:05",
+		})
 		logger.SetOutput(os.Stdout)
 		logger.Info("日志输出到控制台")
 	} else {
+		// 确保日志目录存在
+		dir := filepath.Dir(logFile)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, err
+		}
+
 		// 打开或创建日志文件
 		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
 			return nil, err
 		}
 
+		// 输出到文件 - 使用文本格式
+		logger.SetFormatter(&logrus.TextFormatter{
+			FullTimestamp:   true,
+			TimestampFormat: "2006-01-02 15:04:05",
+		})
 		logger.SetOutput(file)
 		logger.Infof("日志输出到文件: %s", logFile)
 	}
@@ -89,8 +97,9 @@ func SetupGlobalLogger(logFile string) error {
 
 	// 设置全局logrus配置
 	logrus.SetOutput(file)
-	logrus.SetFormatter(&logrus.JSONFormatter{
-		TimestampFormat: time.RFC3339,
+	logrus.SetFormatter(&logrus.TextFormatter{
+		FullTimestamp:   true,
+		TimestampFormat: "2006-01-02 15:04:05",
 	})
 	logrus.SetLevel(logrus.InfoLevel)
 
