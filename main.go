@@ -14,20 +14,13 @@ import (
 
 func main() {
 	var (
-		headless bool
-		binPath  string
 		httpPort string
 	)
-	flag.BoolVar(&headless, "headless", true, "是否无头模式")
-	flag.StringVar(&binPath, "bin", "", "浏览器二进制文件路径")
 	flag.StringVar(&httpPort, "http-port", ":6170", "HTTP服务器端口")
 	flag.Parse()
 
 	// 初始化配置
-	config := &Config{
-		Headless: headless,
-		BinPath:  binPath,
-	}
+	config := &Config{}
 
 	// 初始化小红书服务
 	xhsService := NewXHSService(config)
@@ -58,24 +51,28 @@ func main() {
 	logrus.Info("收到关闭信号，开始优雅关闭...")
 
 	// 开始优雅关闭
-	gracefulShutdown(httpServer)
+	gracefulShutdown(httpServer, xhsService)
 }
 
 // gracefulShutdown 优雅关闭HTTP服务器
-func gracefulShutdown(httpServer *HTTPServer) {
+func gracefulShutdown(httpServer *HTTPServer, xhsService *XHSService) {
 	logrus.Info("开始优雅关闭服务器...")
 
 	// 设置关闭超时
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
-	// 关闭HTTP服务器
+	// 先关闭HTTP服务器，停止接收新请求
 	logrus.Info("正在关闭HTTP服务器...")
 	if err := httpServer.Shutdown(ctx); err != nil {
 		logrus.Errorf("HTTP服务器关闭失败: %v", err)
 	} else {
 		logrus.Info("HTTP服务器已成功关闭")
 	}
+
+	// 再关闭XHS服务和浏览器
+	logrus.Info("正在关闭XHS服务...")
+	xhsService.Close()
 
 	logrus.Info("应用程序已退出")
 }

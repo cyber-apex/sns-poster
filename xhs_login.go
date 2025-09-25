@@ -27,11 +27,7 @@ func NewXHSLogin(page *rod.Page) *XHSLogin {
 func (l *XHSLogin) CheckLoginStatus(ctx context.Context) (bool, error) {
 	pp := l.page.Context(ctx)
 
-	// 先加载保存的cookies
-	cookieManager := NewCookieManager()
-	if err := cookieManager.SetCookies(pp); err != nil {
-		logrus.Warnf("CheckLoginStatus: 设置cookies失败: %v", err)
-	}
+	// Cookie已经在Browser.NewPage()中自动加载
 
 	pp.MustNavigate("https://www.xiaohongshu.com/explore").MustWaitLoad()
 
@@ -53,11 +49,7 @@ func (l *XHSLogin) CheckLoginStatus(ctx context.Context) (bool, error) {
 func (l *XHSLogin) Login(ctx context.Context) error {
 	pp := l.page.Context(ctx)
 
-	// 先尝试加载保存的cookies
-	cookieManager := NewCookieManager()
-	if err := cookieManager.SetCookies(pp); err != nil {
-		logrus.Warnf("设置cookies失败: %v", err)
-	}
+	// Cookie已经在Browser.NewPage()中自动加载
 
 	// 导航到小红书首页，这会触发二维码弹窗
 	pp.MustNavigate("https://www.xiaohongshu.com/explore").MustWaitLoad()
@@ -68,6 +60,7 @@ func (l *XHSLogin) Login(ctx context.Context) error {
 	// 检查是否已经登录
 	if exists, _, _ := pp.Has(".main-container .user .link-wrapper .channel"); exists {
 		// 已经登录，保存cookies
+		cookieManager := NewCookieManager()
 		if err := cookieManager.SaveCookies(pp); err != nil {
 			logrus.Warnf("保存cookies失败: %v", err)
 		}
@@ -93,6 +86,7 @@ func (l *XHSLogin) Login(ctx context.Context) error {
 	}
 
 	// 保存cookies
+	cookieManager := NewCookieManager()
 	if err := cookieManager.SaveCookies(pp); err != nil {
 		logrus.Warnf("保存cookies失败: %v", err)
 	}

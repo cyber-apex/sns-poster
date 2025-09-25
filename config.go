@@ -2,8 +2,6 @@ package main
 
 // Config 应用配置
 type Config struct {
-	Headless bool   // 是否使用无头浏览器
-	BinPath  string // 浏览器二进制文件路径
 	Username string // 登录用户名（可选，用于显示）
 }
 
@@ -19,8 +17,6 @@ func InitConfig(config *Config) {
 func GetConfig() *Config {
 	if globalConfig == nil {
 		return &Config{
-			Headless: true,
-			BinPath:  "",
 			Username: "",
 		}
 	}

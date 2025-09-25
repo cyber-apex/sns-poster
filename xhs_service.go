@@ -11,14 +11,16 @@ import (
 
 // XHSService 小红书服务
 type XHSService struct {
-	config *Config
+	config  *Config
+	browser *Browser
 }
 
 // NewXHSService 创建小红书服务
 func NewXHSService(config *Config) *XHSService {
 	InitConfig(config)
 	return &XHSService{
-		config: config,
+		config:  config,
+		browser: NewBrowser(config), // 创建持久的浏览器实例
 	}
 }
 
@@ -44,10 +46,7 @@ type PublishResponse struct {
 
 // CheckLoginStatus 检查登录状态
 func (s *XHSService) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, error) {
-	browser := NewBrowser(s.config)
-	defer browser.Close()
-
-	page := browser.NewPage()
+	page := s.browser.NewPage()
 	defer page.Close()
 
 	loginAction := NewXHSLogin(page)
@@ -67,10 +66,7 @@ func (s *XHSService) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse
 
 // Login 登录到小红书
 func (s *XHSService) Login(ctx context.Context) (*LoginResponse, error) {
-	browser := NewBrowser(s.config)
-	defer browser.Close()
-
-	page := browser.NewPage()
+	page := s.browser.NewPage()
 	defer page.Close()
 
 	loginAction := NewXHSLogin(page)
@@ -89,6 +85,32 @@ func (s *XHSService) Login(ctx context.Context) (*LoginResponse, error) {
 	}
 
 	return response, nil
+}
+
+// Close 关闭服务和浏览器
+func (s *XHSService) Close() {
+	if s.browser != nil {
+		logrus.Info("正在关闭浏览器实例...")
+		// 使用goroutine和超时来避免无限等待
+		done := make(chan bool, 1)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logrus.Warnf("关闭浏览器时发生panic: %v", r)
+				}
+			}()
+			s.browser.Close()
+			done <- true
+		}()
+
+		// 等待关闭完成或超时
+		select {
+		case <-done:
+			logrus.Info("浏览器实例已成功关闭")
+		case <-time.After(5 * time.Second):
+			logrus.Warn("浏览器关闭超时，强制继续")
+		}
+	}
 }
 
 // PublishContent 发布内容
@@ -135,20 +157,8 @@ func (s *XHSService) publishContent(ctx context.Context, content PublishContent)
 	publishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	browser := NewBrowser(s.config)
-	defer browser.Close()
-
-	page := browser.NewPage()
+	page := s.browser.NewPage()
 	defer page.Close()
-
-	// 确保在发布前加载保存的cookies
-	cookieManager := NewCookieManager()
-	err := cookieManager.SetCookies(page)
-	if err != nil {
-		logrus.Warnf("加载cookies失败: %v", err)
-	} else {
-		logrus.Info("已加载保存的cookies")
-	}
 
 	publisher, err := NewXHSPublisher(page)
 	if err != nil {
