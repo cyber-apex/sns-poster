@@ -21,8 +21,8 @@ type QRCodeDisplay struct {
 // NewQRCodeDisplay 创建二维码显示器
 func NewQRCodeDisplay() *QRCodeDisplay {
 	return &QRCodeDisplay{
-		Scale:     1, // 默认原始大小
-		CharScale: 2, // 默认每个像素用2个字符，提高可扫描性
+		Scale:     4, // 默认缩小到1/4大小，节省空间
+		CharScale: 1, // 默认每个像素用1个字符，不放大
 	}
 }
 
@@ -163,13 +163,15 @@ func (q *QRCodeDisplay) printQRCodeASCII(imageData []byte) error {
 
 	// 如果未设置，使用智能默认值
 	if scale == 0 {
-		scale = 1
-		if width > 200 || height > 200 {
-			scale = 2 // 大图像时适当缩小
+		scale = 4 // 默认缩小到1/4大小
+		if width > 300 || height > 300 {
+			scale = 6 // 特大图像时缩小更多
+		} else if width > 200 || height > 200 {
+			scale = 5 // 大图像时适当缩小
 		}
 	}
 	if charScale == 0 {
-		charScale = 2 // 默认放大2倍
+		charScale = 1 // 默认不放大
 	}
 
 	logrus.Info("========================================")

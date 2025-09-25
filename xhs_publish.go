@@ -171,26 +171,62 @@ func (p *XHSPublisher) Publish(ctx context.Context, content PublishContent) erro
 }
 
 func (p *XHSPublisher) uploadImages(page *rod.Page, imagesPaths []string) error {
-	pp := page.Timeout(30 * time.Second)
+	pp := page.Timeout(60 * time.Second) // 增加超时时间
 
-	// 验证文件路径有效性
-	for _, path := range imagesPaths {
-		if _, err := os.Stat(path); os.IsNotExist(err) {
+	// 验证文件路径有效性和文件大小
+	for i, path := range imagesPaths {
+		stat, err := os.Stat(path)
+		if os.IsNotExist(err) {
 			return errors.Wrapf(err, "图片文件不存在: %s", path)
+		}
+		slog.Info("准备上传图片", "index", i+1, "path", path, "size", stat.Size())
+
+		// 检查文件大小（小红书限制20MB）
+		if stat.Size() > 20*1024*1024 {
+			return fmt.Errorf("图片文件过大: %s (%.2fMB > 20MB)", path, float64(stat.Size())/1024/1024)
 		}
 	}
 
-	// 等待上传输入框出现
-	uploadInput, err := pp.Element(".upload-input")
-	if err != nil {
-		return fmt.Errorf("查找上传输入框失败: %w", err)
+	// 尝试多种上传输入框选择器
+	uploadSelectors := []string{
+		".upload-input",
+		"input[type='file']",
+		"input[accept*='image']",
+		".upload-area input",
+		"[class*='upload'] input[type='file']",
 	}
 
-	// 上传多个文件
+	var uploadInput *rod.Element
+	var err error
+
+	for _, selector := range uploadSelectors {
+		uploadInput, err = pp.Element(selector)
+		if err == nil {
+			slog.Info("找到上传输入框", "selector", selector)
+			break
+		}
+		slog.Debug("上传选择器未找到", "selector", selector, "error", err)
+	}
+
+	if uploadInput == nil {
+		// 截图调试
+		screenshot, _ := pp.Screenshot(true, nil)
+		if screenshot != nil {
+			os.WriteFile("upload_debug.png", screenshot, 0644)
+			slog.Info("保存上传调试截图: upload_debug.png")
+		}
+		return fmt.Errorf("未找到上传输入框")
+	}
+
+	// 使用传统文件上传方式（通过共享目录）
+	slog.Info("使用文件路径上传", "count", len(imagesPaths))
 	err = uploadInput.SetFiles(imagesPaths)
 	if err != nil {
 		return fmt.Errorf("设置上传文件失败: %w", err)
 	}
+
+	slog.Info("文件设置完成，等待上传处理...")
+	time.Sleep(2 * time.Second)
 
 	// 等待并验证上传完成
 	return p.waitForUploadComplete(pp, len(imagesPaths))
@@ -198,28 +234,69 @@ func (p *XHSPublisher) uploadImages(page *rod.Page, imagesPaths []string) error 
 
 // waitForUploadComplete 等待并验证上传完成
 func (p *XHSPublisher) waitForUploadComplete(page *rod.Page, expectedCount int) error {
-	maxWaitTime := 60 * time.Second
-	checkInterval := 500 * time.Millisecond
+	maxWaitTime := 90 * time.Second  // 增加等待时间
+	checkInterval := 1 * time.Second // 减少检查频率避免过于频繁
 	start := time.Now()
 
 	slog.Info("开始等待图片上传完成", "expected_count", expectedCount)
 
-	for time.Since(start) < maxWaitTime {
-		// 使用具体的pr类名检查已上传的图片
-		uploadedImages, err := page.Elements(".img-preview-area .pr")
+	// 多种可能的上传完成指示器
+	uploadIndicators := []string{
+		".img-preview-area .pr",                // 原始选择器
+		".img-preview img",                     // 预览图片
+		"[class*='preview'] img",               // 包含preview的类
+		".upload-item img",                     // 上传项目中的图片
+		"[class*='upload'][class*='item'] img", // 上传项目
+		".file-item img",                       // 文件项目
+		"[class*='image'][class*='item']",      // 图片项目
+		".pic-item",                            // 图片项目
+		"[class*='pic'][class*='item']",        // 图片相关项目
+	}
 
-		if err == nil {
-			currentCount := len(uploadedImages)
-			slog.Info("检测到已上传图片", "current_count", currentCount, "expected_count", expectedCount)
-			if currentCount >= expectedCount {
-				slog.Info("所有图片上传完成", "count", currentCount)
-				return nil
+	lastLogTime := time.Now()
+
+	for time.Since(start) < maxWaitTime {
+		var maxFound int
+		var bestSelector string
+
+		// 尝试所有选择器，找到最多元素的那个
+		for _, selector := range uploadIndicators {
+			elements, err := page.Elements(selector)
+			if err == nil && len(elements) > maxFound {
+				maxFound = len(elements)
+				bestSelector = selector
 			}
-		} else {
-			slog.Debug("未找到已上传图片元素")
+		}
+
+		// 每5秒输出一次日志，避免过多输出
+		if time.Since(lastLogTime) >= 5*time.Second {
+			slog.Info("检测到已上传图片", "current_count", maxFound, "expected_count", expectedCount, "best_selector", bestSelector)
+			lastLogTime = time.Now()
+
+			// 如果长时间没有找到任何上传的图片，截图调试
+			if maxFound == 0 && time.Since(start) > 30*time.Second {
+				screenshot, _ := page.Screenshot(true, nil)
+				if screenshot != nil {
+					filename := fmt.Sprintf("upload_wait_debug_%d.png", time.Since(start)/time.Second)
+					os.WriteFile(filename, screenshot, 0644)
+					slog.Info("保存等待上传调试截图", "filename", filename)
+				}
+			}
+		}
+
+		if maxFound >= expectedCount {
+			slog.Info("所有图片上传完成", "count", maxFound, "used_selector", bestSelector)
+			return nil
 		}
 
 		time.Sleep(checkInterval)
+	}
+
+	// 最终截图用于调试
+	screenshot, _ := page.Screenshot(true, nil)
+	if screenshot != nil {
+		os.WriteFile("upload_timeout_debug.png", screenshot, 0644)
+		slog.Info("保存上传超时调试截图: upload_timeout_debug.png")
 	}
 
 	return errors.New("上传超时，请检查网络连接和图片大小")
