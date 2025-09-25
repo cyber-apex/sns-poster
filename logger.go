@@ -47,12 +47,6 @@ func CreateCustomLogger(logFile string) (*logrus.Logger, error) {
 		logger.SetOutput(os.Stdout)
 		logger.Info("日志输出到控制台")
 	} else {
-		// 确保日志目录存在
-		dir := filepath.Dir(logFile)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, err
-		}
-
 		// 打开或创建日志文件
 		file, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 		if err != nil {
