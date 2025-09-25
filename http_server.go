@@ -563,7 +563,6 @@ func (s *HTTPServer) qrDisplayPageHandler(c *gin.Context) {
             fetch('/api/v1/login/status')
                 .then(response => response.json())
                 .then(data => {
-                    console.log('登录状态检查结果:', data);
                     if (data.success && data.data && data.data.is_logged_in) {
                         document.getElementById('status').className = 'status success';
                         document.getElementById('status').innerHTML = '✅ 登录成功！';
@@ -577,19 +576,10 @@ func (s *HTTPServer) qrDisplayPageHandler(c *gin.Context) {
                         setTimeout(() => {
                             document.getElementById('status').innerHTML = '✅ 登录成功！您可以关闭此页面了';
                         }, 3000);
-                    } else {
-                        // 显示当前状态（调试用）
-                        const statusDiv = document.getElementById('status');
-                        if (statusDiv.innerHTML === '⏳ 等待扫码登录...') {
-                            const now = new Date().toLocaleTimeString();
-                            statusDiv.innerHTML = ` + "`" + `⏳ 等待扫码登录... (${now})` + "`" + `;
-                        }
                     }
                 })
                 .catch(error => {
                     console.error('检查登录状态失败:', error);
-                    // 显示错误状态
-                    document.getElementById('status').innerHTML = '❌ 检查登录状态失败，请刷新页面';
                 });
         }
         

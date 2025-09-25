@@ -77,7 +77,7 @@ pipeline {
                 echo 'Deploying...'
                 sh '''
                     sudo systemctl restart ${SERVICE_NAME}
-                    sleep 10
+                    sleep 5
                     sudo systemctl status ${SERVICE_NAME}
                 '''
             }

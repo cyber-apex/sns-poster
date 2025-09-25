@@ -37,66 +37,18 @@ func (l *XHSLogin) CheckLoginStatus(ctx context.Context) (bool, error) {
 
 	pp.MustNavigate("https://www.xiaohongshu.com/explore").MustWaitLoad()
 
-	time.Sleep(2 * time.Second)
+	time.Sleep(1 * time.Second)
 
-	// 尝试多个登录状态检测选择器
-	loginSelectors := []string{
-		".main-container .user .link-wrapper .channel",
-		".user-info",
-		".avatar",
-		".profile-info",
-		"[data-testid='user-avatar']",
-		".header-info .user",
-		".personal-info",
-		".login-info .user",
-		// 新增更通用的选择器
-		"img[alt*='头像']",
-		"img[alt*='avatar']",
-		".user-avatar",
-		".header-avatar",
-		// 检查是否有用户菜单
-		".user-menu",
-		".profile-menu",
-		// 检查URL是否包含用户信息
+	exists, _, err := pp.Has(`.main-container .user .link-wrapper .channel`)
+	if err != nil {
+		return false, errors.Wrap(err, "check login status failed")
 	}
 
-	for _, selector := range loginSelectors {
-		if exists, _, err := pp.Has(selector); err == nil && exists {
-			logrus.Debugf("通过选择器 %s 检测到已登录", selector)
-			return true, nil
-		}
+	if !exists {
+		return false, nil
 	}
 
-	// 检查当前URL是否表明已登录
-	currentURL := pp.MustInfo().URL
-	if strings.Contains(currentURL, "/user/") || strings.Contains(currentURL, "/profile/") {
-		logrus.Debug("通过URL检测到已登录")
-		return true, nil
-	}
-
-	// 检查页面是否没有登录按钮（间接说明已登录）
-	loginBtnSelectors := []string{
-		".login-btn",
-		".sign-btn",
-		"[data-testid='login-button']",
-		"button[class*='login']",
-		"a[href*='login']",
-	}
-
-	hasLoginBtn := false
-	for _, selector := range loginBtnSelectors {
-		if exists, _, err := pp.Has(selector); err == nil && exists {
-			hasLoginBtn = true
-			break
-		}
-	}
-
-	if !hasLoginBtn {
-		logrus.Debug("未发现登录按钮，可能已登录")
-		return true, nil
-	}
-
-	return false, nil
+	return true, nil
 }
 
 // Login 登录到小红书
@@ -111,17 +63,13 @@ func (l *XHSLogin) Login(ctx context.Context) error {
 	// 等待一小段时间让页面完全加载
 	time.Sleep(2 * time.Second)
 
-	// 检查是否已经登录（使用改进的检测逻辑）
-	isLoggedIn, err := l.CheckLoginStatus(ctx)
-	if err != nil {
-		logrus.Warnf("检查登录状态失败: %v", err)
-	} else if isLoggedIn {
+	// 检查是否已经登录
+	if exists, _, _ := pp.Has(".main-container .user .link-wrapper .channel"); exists {
 		// 已经登录，保存cookies
 		cookieManager := NewCookieManager()
 		if err := cookieManager.SaveCookies(pp); err != nil {
 			logrus.Warnf("保存cookies失败: %v", err)
 		}
-		logrus.Info("检测到已登录状态")
 		return nil
 	}
 
@@ -413,60 +361,23 @@ func (l *XHSLogin) waitForLoginSuccess(page *rod.Page, ctx context.Context) erro
 	deadline := time.Now().Add(timeout)
 
 	for time.Now().Before(deadline) {
-		// 使用改进的登录状态检测逻辑
-		loginSelectors := []string{
-			".main-container .user .link-wrapper .channel",
+		// 检查是否登录成功
+		if exists, _, _ := page.Has(".main-container .user .link-wrapper .channel"); exists {
+			return nil
+		}
+
+		// 检查是否有其他登录成功的标识
+		successSelectors := []string{
 			".user-info",
-			".avatar",
 			".profile-info",
 			"[data-testid='user-avatar']",
-			".header-info .user",
-			".personal-info",
-			".login-info .user",
-			// 新增更通用的选择器
-			"img[alt*='头像']",
-			"img[alt*='avatar']",
-			".user-avatar",
-			".header-avatar",
-			// 检查是否有用户菜单
-			".user-menu",
-			".profile-menu",
+			".avatar",
 		}
 
-		for _, selector := range loginSelectors {
+		for _, selector := range successSelectors {
 			if exists, _, _ := page.Has(selector); exists {
-				logrus.Infof("通过选择器 %s 检测到登录成功", selector)
 				return nil
 			}
-		}
-
-		// 检查当前URL是否表明已登录
-		currentURL := page.MustInfo().URL
-		if strings.Contains(currentURL, "/user/") || strings.Contains(currentURL, "/profile/") {
-			logrus.Info("通过URL检测到登录成功")
-			return nil
-		}
-
-		// 检查页面是否没有登录按钮（间接说明已登录）
-		loginBtnSelectors := []string{
-			".login-btn",
-			".sign-btn",
-			"[data-testid='login-button']",
-			"button[class*='login']",
-			"a[href*='login']",
-		}
-
-		hasLoginBtn := false
-		for _, selector := range loginBtnSelectors {
-			if exists, _, _ := page.Has(selector); exists {
-				hasLoginBtn = true
-				break
-			}
-		}
-
-		if !hasLoginBtn {
-			logrus.Info("未发现登录按钮，登录可能已成功")
-			return nil
 		}
 
 		select {
@@ -474,7 +385,6 @@ func (l *XHSLogin) waitForLoginSuccess(page *rod.Page, ctx context.Context) erro
 			return ctx.Err()
 		case <-time.After(checkInterval):
 			// 继续等待
-			logrus.Debug("继续等待登录成功...")
 		}
 	}
 
