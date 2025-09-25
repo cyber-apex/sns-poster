@@ -308,30 +308,28 @@ func (l *XHSLogin) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) err
 
 		logrus.Infof("二维码截图转换为data URL，大小: %d bytes", len(base64Data))
 
-		// 使用新的Web界面显示二维码
+		// 设置QR码到Web界面
 		if l.qrCallback != nil {
 			l.qrCallback(dataURL)
-			logrus.Info("二维码已发送到Web界面，请在浏览器中查看")
-		} else {
-			// 回退到原有的终端显示方式
-			if err := qrDisplay.DisplayQRCode(dataURL); err != nil {
-				logrus.Warnf("显示二维码失败: %v", err)
-				// 回退到基本说明
-				qrDisplay.printQRCodeInstructions(dataURL)
-			}
 		}
+
+		// 简洁的输出提示
+		logrus.Info("========================================")
+		logrus.Info("📱 请访问以下链接查看登录二维码:")
+		logrus.Info("   http://localhost:6170/qr")
+		logrus.Info("========================================")
 	} else {
 		logrus.Infof("获取到二维码src: %s", (*src)[:min(100, len(*src))])
-		// 使用新的Web界面显示二维码
+		// 设置QR码到Web界面
 		if l.qrCallback != nil {
 			l.qrCallback(*src)
-			logrus.Info("二维码已发送到Web界面，请在浏览器中查看")
-		} else {
-			// 回退到原有的终端显示方式
-			if err := qrDisplay.DisplayQRCode(*src); err != nil {
-				logrus.Warnf("显示二维码失败: %v", err)
-			}
 		}
+
+		// 简洁的输出提示
+		logrus.Info("========================================")
+		logrus.Info("📱 请访问以下链接查看登录二维码:")
+		logrus.Info("   http://localhost:6170/qr")
+		logrus.Info("========================================")
 
 		// 如果是data URL，也保存到文件
 		if strings.HasPrefix(*src, "data:image/") {
