@@ -11,6 +11,12 @@ publish_page_debug.png
 *.zip
 *.tar.gz
 
+# CI/CD artifacts
+coverage.out
+coverage.html
+gosec-report.json
+release/
+
 # IDE files
 .vscode/
 .idea/
