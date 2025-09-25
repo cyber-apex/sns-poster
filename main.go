@@ -19,7 +19,7 @@ func main() {
 		logFile  string
 	)
 	flag.StringVar(&httpPort, "http-port", ":6170", "HTTP服务器端口")
-	flag.StringVar(&logFile, "log-file", "", "日志文件路径 (留空则输出到控制台)")
+	flag.StringVar(&logFile, "log-file", "xhs-poster.log", "日志文件路径 (留空则输出到控制台)")
 
 	// 立即解析标志，避免与rod的标志冲突
 	flag.Parse()
@@ -37,9 +37,6 @@ func main() {
 
 	// 创建HTTP服务器
 	httpServer := NewHTTPServer(xhsService)
-
-	// 设置双向引用，让XHSService可以使用HTTPServer显示QR码
-	xhsService.SetHTTPServer(httpServer)
 
 	// 设置信号处理
 	quit := make(chan os.Signal, 1)
@@ -104,19 +101,15 @@ func logServerStartupInfo() {
 	logrus.Info("========================================")
 	logrus.Info("📡 HTTP API: http://localhost:6170")
 	logrus.Info("🏥 健康检查: http://localhost:6170/health")
-	logrus.Info("📱 二维码登录: http://localhost:6170/qr")
 	logrus.Info("")
 	logrus.Info("📝 API端点:")
 	logrus.Info("  • GET  /api/v1/login/status - 检查登录状态")
 	logrus.Info("  • POST /api/v1/login - 手动登录")
 	logrus.Info("  • POST /api/v1/publish - 发布内容 (需要登录)")
-	logrus.Info("  • GET  /qr - 二维码登录页面")
-	logrus.Info("  • GET  /api/qr/current - 获取当前二维码")
 	logrus.Info("")
-	logrus.Info("🔐 智能登录:")
+	logrus.Info("🔐 自动登录:")
 	logrus.Info("  访问 /api/v1/publish 将自动触发登录流程")
-	logrus.Info("  需要登录时会自动打开浏览器显示二维码")
-	logrus.Info("  或手动访问 http://localhost:6170/qr 查看二维码")
+	logrus.Info("  首次访问时会在终端显示二维码供扫码登录")
 	logrus.Info("")
 	logrus.Info("🧪 测试脚本:")
 	logrus.Info("  ./quick_test_post.sh - 快速测试")

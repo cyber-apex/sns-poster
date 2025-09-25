@@ -11,9 +11,8 @@ import (
 
 // XHSService 小红书服务
 type XHSService struct {
-	config     *Config
-	browser    *Browser
-	httpServer *HTTPServer // 用于QR码显示
+	config  *Config
+	browser *Browser
 }
 
 // NewXHSService 创建小红书服务
@@ -23,11 +22,6 @@ func NewXHSService(config *Config) *XHSService {
 		config:  config,
 		browser: NewBrowser(config), // 创建持久的浏览器实例
 	}
-}
-
-// SetHTTPServer 设置HTTP服务器引用（用于QR码显示）
-func (s *XHSService) SetHTTPServer(httpServer *HTTPServer) {
-	s.httpServer = httpServer
 }
 
 // LoginStatusResponse 登录状态响应
@@ -76,11 +70,6 @@ func (s *XHSService) Login(ctx context.Context) (*LoginResponse, error) {
 	defer page.Close()
 
 	loginAction := NewXHSLogin(page)
-
-	// 如果有HTTP服务器，设置QR码显示回调
-	if s.httpServer != nil {
-		loginAction.SetQRCallback(s.httpServer.SetQRCode)
-	}
 
 	err := loginAction.Login(ctx)
 	if err != nil {
