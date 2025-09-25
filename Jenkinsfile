@@ -76,9 +76,9 @@ pipeline {
             steps {
                 echo 'Deploying...'
                 sh '''
-                    systemctl restart ${SERVICE_NAME}
+                    sudo systemctl restart ${SERVICE_NAME}
                     sleep 10
-                    systemctl status ${SERVICE_NAME}
+                    sudo systemctl status ${SERVICE_NAME}
                 '''
             }
         }
