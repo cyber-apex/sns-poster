@@ -20,9 +20,7 @@ pipeline {
                 echo 'Installing dependencies...'
                 sh '''
                     PATH=$PATH:${GOPATH}
-                    go mod download
-                    go mod verify
-                    go mod tidy
+                    go get
                 '''
             }
         }
