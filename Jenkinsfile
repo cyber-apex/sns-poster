@@ -4,7 +4,9 @@ pipeline {
     environment {
         PROJECT_NAME = 'xhs-poster'
         BINARY_NAME = 'xhs-poster'
-        GOPATH="/usr/local/go/bin:/var/lib/jenkins/go/bin"
+        // Use workspace subdirectory for Go modules and cache
+        GOCACHE = "${env.WORKSPACE}/.gocache"
+        GOMODCACHE = "${env.WORKSPACE}/.gomodcache"
     }
     
     stages {
@@ -15,28 +17,57 @@ pipeline {
             }
         }
         
+        stage('Setup Go Environment') {
+            steps {
+                echo 'Setting up Go environment...'
+                sh '''
+                    # Add Go to PATH
+                    export PATH=/usr/local/go/bin:$PATH
+                    
+                    # Create cache directories in workspace
+                    mkdir -p ${WORKSPACE}/.gocache
+                    mkdir -p ${WORKSPACE}/.gomodcache
+                    
+                    # Set Go environment variables
+                    export GOCACHE=${WORKSPACE}/.gocache
+                    export GOMODCACHE=${WORKSPACE}/.gomodcache
+                    export CGO_ENABLED=0
+                    
+                    # Verify Go installation
+                    go version
+                    go env GOCACHE
+                    go env GOMODCACHE
+                    
+                    # Download dependencies
+                    go mod download
+                    go mod verify
+                '''
+            }
+        }
+        
         stage('Build') {
-            parallel {
-                stage('Linux Build') {
-                    steps {
-                        echo 'Building for Linux...'
-                        sh '''
-                            PATH=$PATH:${GOPATH}
-                            export GOOS=linux
-                            export GOARCH=amd64
-                            export CGO_ENABLED=0
+            steps {
+                echo 'Building for Linux...'
+                sh '''
+                    # Add Go to PATH
+                    export PATH=/usr/local/go/bin:$PATH
+                    
+                    # Set Go environment variables
+                    export GOCACHE=${WORKSPACE}/.gocache
+                    export GOMODCACHE=${WORKSPACE}/.gomodcache
+                    export GOOS=linux
+                    export GOARCH=amd64
+                    export CGO_ENABLED=0
 
-                            go version
-                            go env
-                            
-                            go build -v -o ${BINARY_NAME}-linux-amd64 .
-                            
-                            # Verify the binary
-                            file ${BINARY_NAME}-linux-amd64
-                            ls -la ${BINARY_NAME}-linux-amd64
-                        '''
-                    }
-                }
+                    go version
+                    go env
+                    
+                    go build -v -o ${BINARY_NAME}-linux-amd64 .
+                    
+                    # Verify the binary
+                    file ${BINARY_NAME}-linux-amd64
+                    ls -la ${BINARY_NAME}-linux-amd64
+                '''
             }
         }
     }

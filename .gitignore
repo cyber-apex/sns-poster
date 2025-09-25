@@ -17,6 +17,10 @@ coverage.html
 gosec-report.json
 release/
 
+# Go cache directories (Jenkins)
+.gocache/
+.gomodcache/
+
 # IDE files
 .vscode/
 .idea/
