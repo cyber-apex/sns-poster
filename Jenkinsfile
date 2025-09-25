@@ -1,17 +1,10 @@
 pipeline {
     agent any
     
-    tools {
-        go 'go-1.24'  // Make sure this matches your Jenkins Go tool configuration
-    }
-    
     environment {
-        GO_VERSION = '1.24'
         PROJECT_NAME = 'xhs-poster'
         BINARY_NAME = 'xhs-poster'
-        GOOS = 'linux'
-        GOARCH = 'amd64'
-        CGO_ENABLED = '0'
+        GOPATH="/usr/local/go/bin:/var/lib/jenkins/go/bin"
     }
     
     stages {
@@ -22,22 +15,11 @@ pipeline {
             }
         }
         
-        stage('Environment Setup') {
-            steps {
-                echo 'Setting up Go environment...'
-                sh '''
-                    go version
-                    go env
-                    echo "GOPATH: $GOPATH"
-                    echo "GOROOT: $GOROOT"
-                '''
-            }
-        }
-        
         stage('Dependencies') {
             steps {
                 echo 'Installing dependencies...'
                 sh '''
+                    PATH=$PATH:${GOPATH}
                     go mod download
                     go mod verify
                     go mod tidy
@@ -51,9 +33,13 @@ pipeline {
                     steps {
                         echo 'Building for Linux...'
                         sh '''
+                            PATH=$PATH:${GOPATH}
                             export GOOS=linux
                             export GOARCH=amd64
                             export CGO_ENABLED=0
+
+                            go version
+                            go env
                             
                             go build -v -o ${BINARY_NAME}-linux-amd64 .
                             
