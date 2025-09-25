@@ -19,7 +19,7 @@ func main() {
 		logFile  string
 	)
 	flag.StringVar(&httpPort, "http-port", ":6170", "HTTP服务器端口")
-	flag.StringVar(&logFile, "log-file", "xhs-poster.log", "日志文件路径 (留空则输出到控制台)")
+	flag.StringVar(&logFile, "log-file", "", "日志文件路径 (留空则输出到控制台)")
 
 	// 立即解析标志，避免与rod的标志冲突
 	flag.Parse()
