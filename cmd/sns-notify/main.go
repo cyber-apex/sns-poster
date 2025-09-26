@@ -80,11 +80,11 @@ func initializeServices(cfg *config.Config) *xhs.Service {
 func gracefulShutdown(httpServer *server.HTTPServer, xhsService *xhs.Service) {
 	logrus.Info("开始优雅关闭服务器...")
 
-	// 设置关闭超时
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	// 设置较短的关闭超时
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// 先关闭HTTP服务器，停止接收新请求
+	// 关闭HTTP服务器，停止接收新请求
 	logrus.Info("正在关闭HTTP服务器...")
 	if err := httpServer.Shutdown(ctx); err != nil {
 		logrus.Errorf("HTTP服务器关闭失败: %v", err)
@@ -92,9 +92,10 @@ func gracefulShutdown(httpServer *server.HTTPServer, xhsService *xhs.Service) {
 		logrus.Info("HTTP服务器已成功关闭")
 	}
 
-	// 再关闭XHS服务和浏览器
-	logrus.Info("正在关闭XHS服务...")
+	// XHS服务使用远程浏览器实例，无需关闭浏览器，只需清理连接
+	logrus.Info("清理XHS服务连接...")
 	xhsService.Close()
+	// 注意：不关闭远程浏览器实例，只清理本地连接
 
 	logrus.Info("应用程序已退出")
 }

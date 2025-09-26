@@ -27,31 +27,16 @@ func (b *Browser) NewPage() *rod.Page {
 	return page
 }
 
-// Close 关闭浏览器
+// Close 关闭浏览器连接（不关闭远程浏览器实例）
 func (b *Browser) Close() {
-	// 关闭浏览器连接
-	if b.Browser != nil {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logrus.Warnf("关闭浏览器连接时发生panic: %v", r)
-				}
-			}()
-			b.Browser.Close()
-		}()
-	}
+	// 对于远程浏览器管理器，我们只需要断开连接，不关闭浏览器实例
+	logrus.Info("断开浏览器连接...")
 
-	// 清理启动器
-	if b.launcher != nil {
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logrus.Warnf("清理启动器时发生panic: %v", r)
-				}
-			}()
-			b.launcher.Cleanup()
-		}()
-	}
+	// 不调用 b.Browser.Close()，因为这会关闭远程浏览器实例
+	// 远程浏览器实例由管理器维护，应该保持运行状态
+
+	// 也不需要清理launcher，因为它管理的是远程实例
+	logrus.Info("浏览器连接已断开，远程实例保持运行")
 }
 
 // NewBrowser 创建浏览器实例（硬编码配置）

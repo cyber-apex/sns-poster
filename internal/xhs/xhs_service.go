@@ -90,29 +90,14 @@ func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 	return response, nil
 }
 
-// Close 关闭服务和浏览器
+// Close 关闭服务（不关闭远程浏览器实例）
 func (s *Service) Close() {
+	// 对于远程浏览器管理器，我们只需要断开连接，不关闭浏览器实例
+	// 远程浏览器实例由管理器维护，应该保持运行状态
 	if s.browser != nil {
-		logrus.Info("正在关闭浏览器实例...")
-		// 使用goroutine和超时来避免无限等待
-		done := make(chan bool, 1)
-		go func() {
-			defer func() {
-				if r := recover(); r != nil {
-					logrus.Warnf("关闭浏览器时发生panic: %v", r)
-				}
-			}()
-			s.browser.Close()
-			done <- true
-		}()
-
-		// 等待关闭完成或超时
-		select {
-		case <-done:
-			logrus.Info("浏览器实例已成功关闭")
-		case <-time.After(5 * time.Second):
-			logrus.Warn("浏览器关闭超时，强制继续")
-		}
+		logrus.Info("断开浏览器连接...")
+		s.browser.Close() // 这只是断开连接，不会关闭远程实例
+		logrus.Info("XHS服务清理完成，远程浏览器实例保持运行")
 	}
 }
 

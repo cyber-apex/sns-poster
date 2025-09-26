@@ -8,31 +8,20 @@ import (
 	"os"
 	"strings"
 
-	"github.com/mdp/qrterminal/v3"
 	"github.com/sirupsen/logrus"
 )
 
 // QRCodeDisplay 二维码显示器
 type QRCodeDisplay struct {
-	Scale     int // 图像缩放因子 (1=原始大小, 2=缩小一半)
+	Scale     int // 图像缩放因子 (1=原始大小)
 	CharScale int // 字符放大因子 (每个像素用几个字符表示)
 }
 
 // NewQRCodeDisplay 创建二维码显示器
 func NewQRCodeDisplay() *QRCodeDisplay {
 	return &QRCodeDisplay{
-		Scale:     4, // 默认缩小到1/4大小，节省空间
+		Scale:     2, // 默认原始大小
 		CharScale: 1, // 默认每个像素用1个字符，不放大
-	}
-}
-
-// SetSize 设置二维码显示大小
-func (q *QRCodeDisplay) SetSize(scale, charScale int) {
-	if scale > 0 {
-		q.Scale = scale
-	}
-	if charScale > 0 {
-		q.CharScale = charScale
 	}
 }
 
@@ -94,57 +83,6 @@ func (q *QRCodeDisplay) printQRCodeImageInLog(dataURL string) {
 	logrus.Info("========================================")
 }
 
-// displayQRCodeWithQRTerminal 使用qrterminal库生成高质量二维码
-func (q *QRCodeDisplay) displayQRCodeWithQRTerminal(dataURL string) {
-	logrus.Info("========================================")
-	logrus.Info("🔍 小红书登录二维码 - 高质量显示")
-	logrus.Info("========================================")
-
-	// 创建一个字符串缓冲区来捕获qrterminal的输出
-	var buf strings.Builder
-
-	// 配置qrterminal - 使用半块模式获得最佳分辨率
-	config := qrterminal.Config{
-		HalfBlocks: true,         // 使用半块字符获得更好分辨率
-		Level:      qrterminal.L, // 使用低错误纠正以减少数据量
-		Writer:     &buf,
-		BlackChar:  qrterminal.BLACK,
-		WhiteChar:  qrterminal.WHITE,
-		QuietZone:  1, // 减少边距以节省空间
-	}
-
-	// 数据URL通常太长无法生成QR码，我们生成一个简化的提示信息
-	displayText := "请查看上方日志中的数据URL链接，复制到浏览器查看二维码"
-
-	// 使用defer和recover来处理可能的panic
-	defer func() {
-		if r := recover(); r != nil {
-			logrus.Warnf("qrterminal生成失败: %v", r)
-			logrus.Info("由于数据过长，无法生成QR码")
-			logrus.Info("请使用上方的数据URL链接在浏览器中查看二维码")
-		}
-	}()
-
-	// 生成QR码
-	qrterminal.GenerateWithConfig(displayText, config)
-
-	// 将生成的QR码通过日志输出
-	if buf.Len() > 0 {
-		qrLines := strings.Split(buf.String(), "\n")
-		for _, line := range qrLines {
-			if strings.TrimSpace(line) != "" {
-				logrus.Info(line)
-			}
-		}
-	}
-
-	logrus.Info("========================================")
-	logrus.Info("📱 请使用小红书APP扫描上方二维码登录")
-	logrus.Info("💾 原始二维码图片已保存到: qrcode_login.png")
-	logrus.Info("🌐 或复制上面的数据URL到浏览器查看原始二维码")
-	logrus.Info("========================================")
-}
-
 // printQRCodeASCII 将二维码图像转换为ASCII艺术并打印
 func (q *QRCodeDisplay) printQRCodeASCII(imageData []byte) error {
 	// 解码图像
@@ -160,19 +98,6 @@ func (q *QRCodeDisplay) printQRCodeASCII(imageData []byte) error {
 	// 使用配置的缩放参数
 	scale := q.Scale
 	charScale := q.CharScale
-
-	// 如果未设置，使用智能默认值
-	if scale == 0 {
-		scale = 4 // 默认缩小到1/4大小
-		if width > 300 || height > 300 {
-			scale = 6 // 特大图像时缩小更多
-		} else if width > 200 || height > 200 {
-			scale = 5 // 大图像时适当缩小
-		}
-	}
-	if charScale == 0 {
-		charScale = 1 // 默认不放大
-	}
 
 	logrus.Info("========================================")
 	logrus.Infof("🔍 小红书登录二维码 (%dx%d -> 缩放:%d 字符放大:%d)", width, height, scale, charScale)
@@ -236,35 +161,6 @@ func (q *QRCodeDisplay) displayBackupQRCodeWithQRTerminal() {
 	logrus.Info("🌐 备选方式: 复制数据URL到浏览器查看")
 }
 
-// printQRCodeInstructions 打印二维码说明
-func (q *QRCodeDisplay) printQRCodeInstructions(dataURL string) {
-	fmt.Println()
-	fmt.Println("========================================")
-	fmt.Println("           小红书登录二维码")
-	fmt.Println("========================================")
-	fmt.Println()
-	fmt.Println("请使用小红书手机App扫描以下二维码登录：")
-	fmt.Println()
-
-	// 如果有可用的二维码转ASCII工具，可以在这里显示
-	// 目前先显示数据URL供调试
-	fmt.Printf("二维码数据URL (可在浏览器中查看): \n%s\n", dataURL)
-	fmt.Println()
-	fmt.Println("或者访问以下链接查看二维码：")
-	fmt.Printf("data:text/html,<img src='%s' style='width:300px;height:300px;'/>\n", dataURL)
-	fmt.Println()
-	fmt.Println("登录步骤：")
-	fmt.Println("1. 打开小红书手机App")
-	fmt.Println("2. 点击右下角 '我'")
-	fmt.Println("3. 点击右上角扫码图标")
-	fmt.Println("4. 扫描上方二维码")
-	fmt.Println("5. 在手机上确认登录")
-	fmt.Println()
-	fmt.Println("等待扫码登录...")
-	fmt.Println("========================================")
-	fmt.Println()
-}
-
 // SaveQRCodeToFile 保存二维码到文件
 func (q *QRCodeDisplay) SaveQRCodeToFile(dataURL string, filename string) error {
 	// 分离base64数据
@@ -287,19 +183,4 @@ func (q *QRCodeDisplay) SaveQRCodeToFile(dataURL string, filename string) error 
 
 	logrus.Infof("二维码已保存到: %s", filename)
 	return nil
-}
-
-// printASCIIQRCode 打印ASCII二维码（简化版本）
-func (q *QRCodeDisplay) printASCIIQRCode() {
-	// 这里可以实现一个简单的ASCII二维码显示
-	// 由于复杂性，目前显示提示信息
-	fmt.Println("┌─────────────────────┐")
-	fmt.Println("│                     │")
-	fmt.Println("│  █▀▀ █▀█  █▀▀ █▀█  │")
-	fmt.Println("│  █▄▄ █▀▄  █▄▄ █▄█  │")
-	fmt.Println("│                     │")
-	fmt.Println("│  请在浏览器中查看    │")
-	fmt.Println("│  完整二维码          │")
-	fmt.Println("│                     │")
-	fmt.Println("└─────────────────────┘")
 }

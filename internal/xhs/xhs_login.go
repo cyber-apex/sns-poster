@@ -167,8 +167,6 @@ func (l *Login) triggerLoginQRCode(page *rod.Page) error {
 // waitAndDisplayQRCode 等待并显示二维码
 func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error {
 	qrDisplay := utils.NewQRCodeDisplay()
-	// 设置较小的二维码尺寸，节省终端空间
-	qrDisplay.SetSize(4, 1) // 缩小到1/4，每个像素用1个字符
 
 	// 等待二维码出现
 	logrus.Info("等待二维码加载...")
