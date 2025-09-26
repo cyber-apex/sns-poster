@@ -107,10 +107,22 @@ pipeline {
                     echo "Stopping existing service..."
                     sudo systemctl stop ${SERVICE_NAME} || true
                     
+                    echo "Creating deployment directories..."
+                    sudo mkdir -p /opt/sns-notify
+                    sudo mkdir -p /var/logs/sns-notify
+                    
                     echo "Copying binary to deployment location..."
                     sudo cp ${BINARY_NAME}-linux-amd64 /opt/sns-notify/${BINARY_NAME}
                     sudo chmod +x /opt/sns-notify/${BINARY_NAME}
                     sudo chown root:root /opt/sns-notify/${BINARY_NAME}
+                    
+                    echo "Installing service file..."
+                    if [ -f scripts/sns-notify.service ]; then
+                        sudo cp scripts/sns-notify.service /etc/systemd/system/
+                        sudo systemctl daemon-reload
+                    else
+                        echo "Warning: Service file not found at scripts/sns-notify.service"
+                    fi
                     
                     echo "Starting service..."
                     sudo systemctl start ${SERVICE_NAME}
