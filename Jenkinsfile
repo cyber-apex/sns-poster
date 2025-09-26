@@ -126,10 +126,17 @@ pipeline {
                     
                     echo "Starting service..."
                     sudo systemctl start ${SERVICE_NAME}
-                    sleep 5
-                    
-                    echo "Checking service status..."
+                '''
+            }
+        }
+
+        stage('Check') {
+            steps {
+                echo 'Checking service status...'
+                sh '''
                     sudo systemctl status ${SERVICE_NAME}
+                    
+                    sleep 10
                     
                     echo "Testing health endpoint..."
                     curl -f http://localhost:6170/health || (echo "Health check failed" && exit 1)
