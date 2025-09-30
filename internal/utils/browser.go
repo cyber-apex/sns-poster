@@ -53,9 +53,9 @@ func NewBrowser(cfg *config.Config) *Browser {
 
 	logrus.Info("连接到远程浏览器...")
 
-	// 创建带超时的上下文
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	// 创建带超时的上下文用于连接
+	connectCtx, connectCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer connectCancel()
 
 	// 使用通道来处理连接结果
 	type result struct {
@@ -72,7 +72,8 @@ func NewBrowser(cfg *config.Config) *Browser {
 			}
 		}()
 
-		browser := rod.New().Client(l.MustClient()).Context(ctx).MustConnect()
+		// 注意：不在浏览器实例上设置超时context，避免后续操作被取消
+		browser := rod.New().Client(l.MustClient()).MustConnect()
 		resultChan <- result{browser, nil}
 	}()
 
@@ -94,7 +95,7 @@ func NewBrowser(cfg *config.Config) *Browser {
 		logrus.Fatal("浏览器连接失败")
 		return nil
 
-	case <-ctx.Done():
+	case <-connectCtx.Done():
 		logrus.Fatal("浏览器连接超时(10秒)，请确保Rod管理器已启动: docker ps | grep rod")
 		return nil
 	}
