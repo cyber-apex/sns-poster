@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"context"
+	"time"
+
 	"sns-poster/internal/config"
 
 	"github.com/go-rod/rod"
@@ -27,34 +30,72 @@ func (b *Browser) NewPage() *rod.Page {
 	return page
 }
 
-// Close 关闭浏览器连接（不关闭远程浏览器实例）
+// Close 关闭浏览器连接
 func (b *Browser) Close() {
-	// 对于远程浏览器管理器，我们只需要断开连接，不关闭浏览器实例
 	logrus.Info("断开浏览器连接...")
 
-	// 不调用 b.Browser.Close()，因为这会关闭远程浏览器实例
-	// 远程浏览器实例由管理器维护，应该保持运行状态
+	// 关闭浏览器实例（对于远程管理器，这只会关闭连接，不会关闭远程浏览器进程）
+	if b.Browser != nil {
+		b.Browser.MustClose()
+	}
 
-	// 也不需要清理launcher，因为它管理的是远程实例
-	logrus.Info("浏览器连接已断开，远程实例保持运行")
+	logrus.Info("浏览器连接已断开")
 }
 
 // NewBrowser 创建浏览器实例（硬编码配置）
 func NewBrowser(cfg *config.Config) *Browser {
+	logrus.Info("初始化浏览器管理器...")
+
 	// 硬编码使用管理器模式
 	l := launcher.MustNewManaged("")
 	// Launch with headful mode
 	l.Headless(false).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
 
-	// 启动浏览器并连接
-	browser := rod.New().Client(l.MustClient()).MustConnect()
+	logrus.Info("连接到远程浏览器...")
 
-	// 创建cookie管理器
-	cookieManager := NewCookieManager()
+	// 创建带超时的上下文
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	return &Browser{
-		Browser:       browser,
-		launcher:      l,
-		cookieManager: cookieManager,
+	// 使用通道来处理连接结果
+	type result struct {
+		browser *rod.Browser
+		err     error
+	}
+	resultChan := make(chan result, 1)
+
+	// 在goroutine中尝试连接
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				resultChan <- result{nil, nil}
+			}
+		}()
+
+		browser := rod.New().Client(l.MustClient()).Context(ctx).MustConnect()
+		resultChan <- result{browser, nil}
+	}()
+
+	// 等待连接结果或超时
+	select {
+	case res := <-resultChan:
+		if res.browser != nil {
+			logrus.Info("浏览器连接成功")
+
+			// 创建cookie管理器
+			cookieManager := NewCookieManager()
+
+			return &Browser{
+				Browser:       res.browser,
+				launcher:      l,
+				cookieManager: cookieManager,
+			}
+		}
+		logrus.Fatal("浏览器连接失败")
+		return nil
+
+	case <-ctx.Done():
+		logrus.Fatal("浏览器连接超时(10秒)，请确保Rod管理器已启动: docker ps | grep rod")
+		return nil
 	}
 }

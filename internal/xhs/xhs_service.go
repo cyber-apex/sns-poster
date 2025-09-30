@@ -90,14 +90,11 @@ func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 	return response, nil
 }
 
-// Close 关闭服务（不关闭远程浏览器实例）
+// Close 关闭服务
 func (s *Service) Close() {
-	// 对于远程浏览器管理器，我们只需要断开连接，不关闭浏览器实例
-	// 远程浏览器实例由管理器维护，应该保持运行状态
 	if s.browser != nil {
-		logrus.Info("断开浏览器连接...")
-		s.browser.Close() // 这只是断开连接，不会关闭远程实例
-		logrus.Info("XHS服务清理完成，远程浏览器实例保持运行")
+		s.browser.Close()
+		logrus.Info("XHS服务清理完成")
 	}
 }
 

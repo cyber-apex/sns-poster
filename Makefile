@@ -2,7 +2,7 @@
 
 # Variables
 BINARY_NAME = sns-poster
-BUILD_DIR = ./cmd/sns-poster
+BUILD_DIR = ./cmd
 
 # Directories
 BIN_DIR = ./bin
