@@ -103,10 +103,24 @@ func (s *Service) Close() {
 
 // PublishContent 发布内容
 func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
-	// 验证标题长度 - 小红书限制：最大40个单位长度
-	// 中文/日文/韩文占2个单位，英文/数字占1个单位
-	if titleWidth := runewidth.StringWidth(req.Title); titleWidth > 40 {
-		return nil, fmt.Errorf("标题长度超过限制，当前长度: %d，最大允许: 40", titleWidth)
+	// 自动截取标题长度 - 小红书限制：最大40个显示单位
+	// CJK字符（中文/日文/韩文）占2个单位，英文/数字/符号占1个单位
+	originalWidth := runewidth.StringWidth(req.Title)
+	if originalWidth > 40 {
+		logrus.Warnf("标题长度超过限制 (%d > 40)，开始智能截取", originalWidth)
+
+		// 使用runewidth进行精确截取，确保不超过40个显示单位
+		// 这会正确处理CJK字符的双宽度特性
+		truncated := runewidth.Truncate(req.Title, 40, "")
+		finalWidth := runewidth.StringWidth(truncated)
+
+		originalRunes := len([]rune(req.Title))
+		req.Title = truncated
+		truncatedRunes := len([]rune(req.Title))
+
+		logrus.Infof("截取完成: %d字符 -> %d字符 (%d显示单位 -> %d显示单位)",
+			originalRunes, truncatedRunes, originalWidth, finalWidth)
+		logrus.Infof("截取后的标题: %s", req.Title)
 	}
 
 	// 处理图片：下载URL图片或使用本地路径
