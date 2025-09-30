@@ -12,7 +12,7 @@ Group=root
 WorkingDirectory=/opt/sns-poster
 
 # Binary path
-ExecStart=/bin/bash -c "/opt/sns-poster/sns-poster -http-port=:6170 >> /var/logs/sns-poster/sns-poster.log  2>&1"
+ExecStart=/bin/bash -c "/opt/sns-poster/sns-poster >> /var/logs/sns-poster/sns-poster.log  2>&1"
 
 # Restart policy
 Restart=always
