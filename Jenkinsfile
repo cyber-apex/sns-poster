@@ -65,7 +65,7 @@ pipeline {
                     
                     echo "Building binary..."
                     mkdir -p bin
-                    go build -o bin/${BINARY_NAME}-linux-amd64 ./cmd/sns-poster
+                    go build -ldflags="-s -w" -o bin/${BINARY_NAME}-linux-amd64 ./cmd/sns-poster
                     
                     echo "Verifying binary:"
                     file bin/${BINARY_NAME}-linux-amd64
