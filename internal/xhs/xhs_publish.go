@@ -29,13 +29,14 @@ type Publisher struct {
 }
 
 const (
-	publishURL = `https://creator.xiaohongshu.com/publish/publish?source=official`
+	// 直接进入图片发布模式
+	publishURL = `https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image`
 )
 
 // NewPublisher 创建发布器实例
 func NewPublisher(page *rod.Page) (*Publisher, error) {
-	// 设置更长的超时时间
-	pp := page.Timeout(120 * time.Second)
+	// 使用独立的context，设置足够长的超时时间
+	pp := page.Timeout(300 * time.Second) // 5分钟超时，足够完成发布流程
 
 	slog.Info("开始导航到小红书发布页面", "url", publishURL)
 
@@ -106,45 +107,7 @@ func NewPublisher(page *rod.Page) (*Publisher, error) {
 	if err != nil {
 		return nil, fmt.Errorf("等待上传内容区域可见失败: %w", err)
 	}
-	slog.Info("wait for upload-content visible success")
-
-	// 等待一段时间确保页面完全加载
-	time.Sleep(2 * time.Second)
-
-	createElems, err := pp.Elements("div.creator-tab")
-	if err != nil {
-		return nil, fmt.Errorf("查找创作标签失败: %w", err)
-	}
-
-	// 过滤掉隐藏的元素
-	var visibleElems []*rod.Element
-	for _, elem := range createElems {
-		if isElementVisible(elem) {
-			visibleElems = append(visibleElems, elem)
-		}
-	}
-
-	if len(visibleElems) == 0 {
-		return nil, errors.New("没有找到上传图文元素")
-	}
-
-	for _, elem := range visibleElems {
-		text, err := elem.Text()
-		if err != nil {
-			slog.Error("获取元素文本失败", "error", err)
-			continue
-		}
-
-		if text == "上传图文" {
-			if err := elem.Click(proto.InputMouseButtonLeft, 1); err != nil {
-				slog.Error("点击元素失败", "error", err)
-				continue
-			}
-			break
-		}
-	}
-
-	time.Sleep(1 * time.Second)
+	slog.Info("上传区域已可见，发布页面加载成功")
 
 	return &Publisher{
 		page: pp,
@@ -171,65 +134,58 @@ func (p *Publisher) Publish(ctx context.Context, content PublishContent) error {
 }
 
 func (p *Publisher) uploadImages(page *rod.Page, imagesPaths []string) error {
-	pp := page.Timeout(60 * time.Second) // 增加超时时间
+	slog.Info("开始上传图片", "count", len(imagesPaths))
 
-	// 验证文件路径有效性和文件大小
+	// 验证文件
 	for i, path := range imagesPaths {
 		stat, err := os.Stat(path)
 		if os.IsNotExist(err) {
 			return errors.Wrapf(err, "图片文件不存在: %s", path)
 		}
-		slog.Info("准备上传图片", "index", i+1, "path", path, "size", stat.Size())
+		slog.Info("准备上传", "index", i+1, "path", path, "size_mb", float64(stat.Size())/1024/1024)
 
-		// 检查文件大小（小红书限制20MB）
 		if stat.Size() > 20*1024*1024 {
-			return fmt.Errorf("图片文件过大: %s (%.2fMB > 20MB)", path, float64(stat.Size())/1024/1024)
+			return fmt.Errorf("图片过大: %.2fMB > 20MB", float64(stat.Size())/1024/1024)
 		}
 	}
 
-	// 尝试多种上传输入框选择器
-	uploadSelectors := []string{
-		".upload-input",
-		"input[type='file']",
-		"input[accept*='image']",
-		".upload-area input",
-		"[class*='upload'] input[type='file']",
+	// 查找文件输入框，设置超时
+	slog.Info("查找文件上传输入框...")
+
+	// 先检查页面上所有的input元素
+	allInputs, _ := page.Elements("input")
+	slog.Info("页面上的input元素数量", "count", len(allInputs))
+
+	// 打印页面HTML结构用于调试
+	html, _ := page.HTML()
+	if html != "" {
+		os.WriteFile("page_upload.html", []byte(html), 0644)
+		slog.Info("已保存页面HTML到 page_upload.html")
 	}
 
-	var uploadInput *rod.Element
-	var err error
-
-	for _, selector := range uploadSelectors {
-		uploadInput, err = pp.Element(selector)
-		if err == nil {
-			slog.Info("找到上传输入框", "selector", selector)
-			break
-		}
-		slog.Debug("上传选择器未找到", "selector", selector, "error", err)
-	}
-
-	if uploadInput == nil {
+	uploadInput, err := page.Timeout(10 * time.Second).Element("input[type='file']")
+	if err != nil {
 		// 截图调试
-		screenshot, _ := pp.Screenshot(true, nil)
+		screenshot, _ := page.Screenshot(true, nil)
 		if screenshot != nil {
-			os.WriteFile("upload_debug.png", screenshot, 0644)
-			slog.Info("保存上传调试截图: upload_debug.png")
+			os.WriteFile("upload_input_not_found.png", screenshot, 0644)
+			slog.Error("未找到上传输入框，已保存截图到 upload_input_not_found.png")
 		}
-		return fmt.Errorf("未找到上传输入框")
+		return fmt.Errorf("未找到文件上传输入框: %w", err)
 	}
+	slog.Info("找到文件上传输入框")
 
-	// 使用传统文件上传方式（通过共享目录）
-	slog.Info("使用文件路径上传", "count", len(imagesPaths))
+	// 上传文件
 	err = uploadInput.SetFiles(imagesPaths)
 	if err != nil {
-		return fmt.Errorf("设置上传文件失败: %w", err)
+		return fmt.Errorf("上传文件失败: %w", err)
 	}
 
-	slog.Info("文件设置完成，等待上传处理...")
-	time.Sleep(2 * time.Second)
+	slog.Info("文件已提交，等待处理...")
+	time.Sleep(3 * time.Second)
 
-	// 等待并验证上传完成
-	return p.waitForUploadComplete(pp, len(imagesPaths))
+	// 简单验证上传完成
+	return p.waitForUploadComplete(page, len(imagesPaths))
 }
 
 // waitForUploadComplete 等待并验证上传完成
