@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 
-	"github.com/h2non/filetype"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -162,20 +162,59 @@ func (p *ImageProcessor) isURL(str string) bool {
 }
 
 // downloadImage 下载图片到本地
-func (p *ImageProcessor) downloadImage(url string) (string, error) {
+func (p *ImageProcessor) downloadImage(imageURL string) (string, error) {
+	// 分离URL和查询参数
+	urlParts := strings.Split(imageURL, "?")
+	baseURL := urlParts[0]
+
+	var encodedURL string
+	if len(urlParts) > 1 {
+		// 解析查询参数
+		params := url.Values{}
+		queryParts := strings.Split(urlParts[1], "&")
+
+		for _, part := range queryParts {
+			kv := strings.SplitN(part, "=", 2)
+			if len(kv) == 2 {
+				// URL解码原值（如果已编码），然后重新编码
+				key := kv[0]
+				value, _ := url.QueryUnescape(kv[1])
+				params.Set(key, value)
+			}
+		}
+
+		encodedURL = baseURL + "?" + params.Encode()
+	} else {
+		encodedURL = baseURL
+	}
+
+	logrus.Infof("编码后URL: %s", encodedURL)
+
 	// 生成文件名
-	hash := md5.Sum([]byte(url))
+	hash := md5.Sum([]byte(imageURL))
 	filename := fmt.Sprintf("img_%x", hash)
 
+	// 创建HTTP请求
+	req, err := http.NewRequest("GET", encodedURL, nil)
+	if err != nil {
+		return "", errors.Wrap(err, "创建下载请求失败")
+	}
+
+	// 设置User-Agent避免被拦截
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+
 	// 下载文件
-	resp, err := http.Get(url)
+	client := &http.Client{
+		Timeout: 30 * time.Second,
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", errors.Wrap(err, "下载图片失败")
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", errors.Errorf("下载图片失败，状态码: %d", resp.StatusCode)
+		return "", errors.Errorf("下载图片失败，状态码: %d，URL: %s", resp.StatusCode, encodedURL)
 	}
 
 	// 读取文件内容
@@ -184,18 +223,21 @@ func (p *ImageProcessor) downloadImage(url string) (string, error) {
 		return "", errors.Wrap(err, "读取图片数据失败")
 	}
 
-	// 检测文件类型
-	kind, err := filetype.Match(data)
-	if err != nil {
-		return "", errors.Wrap(err, "检测文件类型失败")
+	logrus.Infof("下载成功，大小: %d bytes", len(data))
+
+	// 简单根据 Content-Type 确定扩展名，默认 jpg
+	contentType := resp.Header.Get("Content-Type")
+	ext := "jpg"
+	if strings.Contains(contentType, "png") {
+		ext = "png"
+	} else if strings.Contains(contentType, "gif") {
+		ext = "gif"
+	} else if strings.Contains(contentType, "webp") {
+		ext = "webp"
 	}
 
-	if !filetype.IsImage(data) {
-		return "", errors.New("文件不是图片格式")
-	}
-
-	// 添加正确的扩展名
-	filename = filename + "." + kind.Extension
+	// 保存文件
+	filename = filename + "." + ext
 	filePath := filepath.Join(p.downloadDir, filename)
 
 	// 写入文件

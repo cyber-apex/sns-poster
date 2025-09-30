@@ -3,6 +3,7 @@ package xhs
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"sns-poster/internal/config"
@@ -14,17 +15,29 @@ import (
 
 // Service 小红书服务
 type Service struct {
-	config  *config.Config
-	browser *utils.Browser
+	config     *config.Config
+	browser    *utils.Browser
+	browserMux sync.Mutex
 }
 
 // NewService 创建小红书服务
 func NewService(cfg *config.Config) *Service {
 	config.InitConfig(cfg)
 	return &Service{
-		config:  cfg,
-		browser: utils.NewBrowser(cfg), // 创建持久的浏览器实例
+		config: cfg,
+		// 不在这里创建浏览器，延迟到首次使用
 	}
+}
+
+// getBrowser 获取或创建浏览器实例（懒加载）
+func (s *Service) getBrowser() *utils.Browser {
+	s.browserMux.Lock()
+	defer s.browserMux.Unlock()
+
+	if s.browser == nil {
+		s.browser = utils.NewBrowser(s.config)
+	}
+	return s.browser
 }
 
 // LoginStatusResponse 登录状态响应
@@ -49,7 +62,7 @@ type PublishResponse struct {
 
 // CheckLoginStatus 检查登录状态
 func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, error) {
-	page := s.browser.NewPage()
+	page := s.getBrowser().NewPage()
 	defer page.Close()
 
 	loginAction := NewLogin(page)
@@ -69,7 +82,7 @@ func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, e
 
 // Login 登录到小红书
 func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
-	page := s.browser.NewPage()
+	page := s.getBrowser().NewPage()
 	defer page.Close()
 
 	loginAction := NewLogin(page)
@@ -156,7 +169,7 @@ func (s *Service) publishContent(ctx context.Context, content PublishContent) er
 	publishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	page := s.browser.NewPage()
+	page := s.getBrowser().NewPage()
 	defer page.Close()
 
 	publisher, err := NewPublisher(page)

@@ -20,6 +20,14 @@ type Browser struct {
 
 // NewPage 创建新页面并自动加载cookies
 func (b *Browser) NewPage() *rod.Page {
+	// 检查浏览器连接是否有效
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Errorf("创建页面失败: %v", r)
+			logrus.Fatal("浏览器连接已断开，请重启应用")
+		}
+	}()
+
 	page := b.Browser.MustPage()
 
 	// 自动加载cookies

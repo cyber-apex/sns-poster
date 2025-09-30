@@ -186,7 +186,16 @@ func (s *HTTPServer) respondError(c *gin.Context, statusCode int, code, message 
 		Details: details,
 	}
 
-	logrus.Errorf("%s %s %d", c.Request.Method, c.Request.URL.Path, statusCode)
+	// 记录详细错误信息
+	logrus.WithFields(logrus.Fields{
+		"method":      c.Request.Method,
+		"path":        c.Request.URL.Path,
+		"status_code": statusCode,
+		"error_code":  code,
+		"message":     message,
+		"details":     details,
+	}).Errorf("API请求失败: %s", message)
+
 	c.JSON(statusCode, response)
 }
 
