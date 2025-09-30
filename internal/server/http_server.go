@@ -8,7 +8,7 @@ import (
 	"syscall"
 	"time"
 
-	"sns-notify/internal/xhs"
+	"sns-poster/internal/xhs"
 
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -240,7 +240,7 @@ func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 func (s *HTTPServer) healthHandler(c *gin.Context) {
 	s.respondSuccess(c, map[string]any{
 		"status":    "healthy",
-		"service":   "sns-notify",
+		"service":   "sns-poster",
 		"timestamp": time.Now().Unix(),
 	}, "服务正常")
 }

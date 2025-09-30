@@ -1,4 +1,7 @@
 # Build artifacts
+bin/
+sns-poster
+sns-poster-*
 xhs-poster
 xhs-poster-bin
 

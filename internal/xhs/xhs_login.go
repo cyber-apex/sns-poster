@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"sns-notify/internal/utils"
+	"sns-poster/internal/utils"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"

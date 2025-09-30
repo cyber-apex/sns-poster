@@ -1,15 +1,15 @@
-# SNS Notify 架构文档
+# SNS Poster 架构文档
 
 ## 🏗️ 项目架构
 
-SNS Notify 采用模块化架构，支持多平台扩展，当前主要支持小红书平台。
+SNS Poster 采用模块化架构，支持多平台扩展，当前主要支持小红书平台。
 
 ## 📁 目录结构
 
 ```
-sns-notify/
+sns-poster/
 ├── cmd/                      # 应用程序入口点
-│   └── sns-notify/          # 主程序
+│   └── sns-poster/          # 主程序
 │       └── main.go         # 程序入口，处理命令行参数和启动服务
 ├── internal/               # 内部模块（不对外暴露）
 │   ├── config/            # 配置管理
@@ -163,7 +163,7 @@ newplatform := api.Group("/newplatform")
 ### 单机部署
 ```
 ┌─────────────────┐
-│   SNS Notify    │
+│   SNS Poster    │
 │   (Binary)      │
 ├─────────────────┤
 │   Chrome        │
@@ -179,7 +179,7 @@ newplatform := api.Group("/newplatform")
 ┌─────────────────┐
 │   Docker        │
 │  ┌─────────────┐│
-│  │ SNS Notify  ││
+│  │ SNS Poster  ││
 │  │ + Chrome    ││
 │  └─────────────┘│
 ├─────────────────┤

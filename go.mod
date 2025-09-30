@@ -1,4 +1,4 @@
-module sns-notify
+module sns-poster
 
 go 1.24.0
 

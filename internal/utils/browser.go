@@ -1,7 +1,7 @@
 package utils
 
 import (
-	"sns-notify/internal/config"
+	"sns-poster/internal/config"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"

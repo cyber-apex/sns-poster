@@ -1,4 +1,4 @@
-# SNS Notify
+# SNS Poster
 
 A web server that provides HTTP REST API for posting content to Social Network Services (SNS) including Xiaohongshu (小红书).
 
@@ -16,20 +16,20 @@ A web server that provides HTTP REST API for posting content to Social Network S
 
 ```bash
 go mod tidy
-go build -o sns-notify .
+go build -o sns-poster .
 ```
 
 ### 2. Run the Server
 
 ```bash
 # Run with default settings (HTTP on :6170)
-./sns-notify
+./sns-poster
 
 # Run with custom port  
-./sns-notify -http-port=:8080
+./sns-poster -http-port=:8080
 
 # Run with visible browser (for debugging)
-./sns-notify -headless=false
+./sns-poster -headless=false
 ```
 
 **🚀 智能自动登录**: 服务采用按需登录策略：
@@ -250,7 +250,7 @@ The service supports two types of image inputs:
           │                      │
           ▼                      ▼
 ┌─────────────────────────────────────────┐
-│            SNS Notify Server            │
+│            SNS Poster Server            │
 │  ┌─────────────┐    ┌─────────────────┐ │
 │  │ HTTP Server │    │   gRPC Server   │ │
 │  └─────────────┘    └─────────────────┘ │

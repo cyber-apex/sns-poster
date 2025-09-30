@@ -1,6 +1,6 @@
-# Jenkins CI/CD Setup for SNS Notify
+# Jenkins CI/CD Setup for SNS Poster
 
-This document explains how to set up Jenkins CI/CD for the SNS Notify project.
+This document explains how to set up Jenkins CI/CD for the SNS Poster project.
 
 ## Prerequisites
 

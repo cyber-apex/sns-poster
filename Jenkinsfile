@@ -2,9 +2,9 @@ pipeline {
     agent any
     
     environment {
-        PROJECT_NAME = 'sns-notify'
-        BINARY_NAME = 'sns-notify'
-        SERVICE_NAME = 'sns-notify.service'
+        PROJECT_NAME = 'sns-poster'
+        BINARY_NAME = 'sns-poster'
+        SERVICE_NAME = 'sns-poster.service'
         // Use workspace subdirectory for Go modules and cache
         GOCACHE = "${env.WORKSPACE}/.gocache"
         GOMODCACHE = "${env.WORKSPACE}/.gomodcache"
@@ -48,7 +48,7 @@ pipeline {
         
         stage('Build') {
             steps {
-                echo 'Building SNS Notify for Linux AMD64...'
+                echo 'Building SNS Poster for Linux AMD64...'
                 sh '''
                     # Add Go to PATH
                     export PATH=/usr/local/go/bin:$PATH
@@ -64,13 +64,14 @@ pipeline {
                     go version
                     
                     echo "Building binary..."
-                    go build -o ${BINARY_NAME}-linux-amd64 ./cmd/sns-notify
+                    mkdir -p bin
+                    go build -o bin/${BINARY_NAME}-linux-amd64 ./cmd/sns-poster
                     
                     echo "Verifying binary:"
-                    file ${BINARY_NAME}-linux-amd64
-                    ls -la ${BINARY_NAME}-linux-amd64
+                    file bin/${BINARY_NAME}-linux-amd64
+                    ls -la bin/${BINARY_NAME}-linux-amd64
                     
-                    echo "Binary size: $(du -h ${BINARY_NAME}-linux-amd64 | cut -f1)"
+                    echo "Binary size: $(du -h bin/${BINARY_NAME}-linux-amd64 | cut -f1)"
                 '''
             }
         }
@@ -102,26 +103,26 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo 'Deploying SNS Notify...'
+                echo 'Deploying SNS Poster...'
                 sh '''
                     echo "Stopping existing service..."
                     sudo systemctl stop ${SERVICE_NAME} || true
                     
                     echo "Creating deployment directories..."
-                    sudo mkdir -p /opt/sns-notify
-                    sudo mkdir -p /var/logs/sns-notify
+                    sudo mkdir -p /opt/sns-poster
+                    sudo mkdir -p /var/logs/sns-poster
                     
                     echo "Copying binary to deployment location..."
-                    sudo cp ${BINARY_NAME}-linux-amd64 /opt/sns-notify/${BINARY_NAME}
-                    sudo chmod +x /opt/sns-notify/${BINARY_NAME}
-                    sudo chown root:root /opt/sns-notify/${BINARY_NAME}
+                    sudo cp bin/${BINARY_NAME}-linux-amd64 /opt/sns-poster/${BINARY_NAME}
+                    sudo chmod +x /opt/sns-poster/${BINARY_NAME}
+                    sudo chown root:root /opt/sns-poster/${BINARY_NAME}
                     
                     echo "Installing service file..."
-                    if [ -f scripts/sns-notify.service ]; then
-                        sudo cp scripts/sns-notify.service /etc/systemd/system/
+                    if [ -f scripts/sns-poster.service ]; then
+                        sudo cp scripts/sns-poster.service /etc/systemd/system/
                         sudo systemctl daemon-reload
                     else
-                        echo "Warning: Service file not found at scripts/sns-notify.service"
+                        echo "Warning: Service file not found at scripts/sns-poster.service"
                     fi
                     
                     echo "Starting service..."
@@ -147,16 +148,16 @@ pipeline {
     
     post {
         success {
-            echo '✅ SNS Notify Pipeline completed successfully!'
+            echo '✅ SNS Poster Pipeline completed successfully!'
             
             // Archive build artifacts
-            archiveArtifacts artifacts: 'sns-notify-linux-amd64', fingerprint: true
+            archiveArtifacts artifacts: 'bin/sns-poster-linux-amd64', fingerprint: true
             
             // Notify on success (configure as needed)
             script {
                 if (env.BRANCH_NAME == 'main' || env.BRANCH_NAME == 'master') {
                     // Add notification logic here (Slack, email, etc.)
-                    echo '🚀 SNS Notify main branch build succeeded - deployed and ready!'
+                    echo '🚀 SNS Poster main branch build succeeded - deployed and ready!'
                     echo "📦 Binary: sns-notify-linux-amd64"
                     echo "🌐 Service: http://localhost:6170"
                     echo "🏥 Health: http://localhost:6170/health"
@@ -165,12 +166,12 @@ pipeline {
         }
         
         failure {
-            echo '❌ SNS Notify Pipeline failed!'
+            echo '❌ SNS Poster Pipeline failed!'
             
             // Notify on failure
             script {
                 // Add notification logic here
-                echo '🔥 SNS Notify build failed - please check the logs'
+                echo '🔥 SNS Poster build failed - please check the logs'
                 echo '📋 Common issues:'
                 echo '  • Go dependencies not available'
                 echo '  • Module build errors'
@@ -179,11 +180,11 @@ pipeline {
         }
         
         unstable {
-            echo '⚠️ SNS Notify Pipeline completed with warnings!'
+            echo '⚠️ SNS Poster Pipeline completed with warnings!'
             
             // Notify on unstable build
             script {
-                echo '⚠️ SNS Notify build completed with warnings - please review'
+                echo '⚠️ SNS Poster build completed with warnings - please review'
                 echo '📋 Check for:'
                 echo '  • Test failures'
                 echo '  • Linting warnings'

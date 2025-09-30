@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"sns-notify/internal/config"
-	"sns-notify/internal/utils"
+	"sns-poster/internal/config"
+	"sns-poster/internal/utils"
 
 	"github.com/mattn/go-runewidth"
 	"github.com/sirupsen/logrus"
