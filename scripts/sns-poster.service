@@ -1,6 +1,5 @@
 [Unit]
 Description=SNS Poster API Service - Multi-platform Social Media Publishing
-Documentation=https://github.com/yourusername/sns-poster
 After=network.target multi-user.target
 Wants=network.target
 
@@ -16,9 +15,11 @@ WorkingDirectory=/opt/sns-poster
 ExecStart=/bin/bash -c "/opt/sns-poster/sns-poster -http-port=:6170 >> /var/logs/sns-poster/sns-poster.log  2>&1"
 
 # Restart policy
-Restart=on-failure
-RestartSec=5s
-RestartPreventExitStatus=1
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
 
 # Resource limits
 LimitNOFILE=65536
@@ -29,16 +30,6 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/logs/sns-poster /opt/sns-poster /tmp
-
-# Environment
-Environment=DISPLAY=:0
-Environment=CHROME_DEVEL_SANDBOX=/usr/lib/chromium/chrome-sandbox
-
-# Health check
-ExecReload=/bin/kill -HUP $MAINPID
-KillMode=mixed
-KillSignal=SIGTERM
-TimeoutSec=30
 
 [Install]
 WantedBy=multi-user.target
