@@ -5,16 +5,11 @@ Wants=network.target
 
 [Service]
 Type=simple
-User=root
-Group=root
-
 # Working directory
 WorkingDirectory=/opt/sns-poster
-
 # Binary path
 ExecStart=/bin/bash -c "/opt/sns-poster/sns-poster >> /var/logs/sns-poster/sns-poster.log  2>&1"
-
-# Restart policy
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=10
 TimeoutStopSec=30
@@ -27,3 +22,4 @@ LimitNPROC=4096
 
 [Install]
 WantedBy=multi-user.target
+Alias=sns-poster.service
