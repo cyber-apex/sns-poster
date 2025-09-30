@@ -125,15 +125,6 @@ func (s *HTTPServer) setupRoutes() *gin.Engine {
 				protected.POST("/publish", s.xhsPublishHandler)
 			}
 		}
-
-		// 保留旧的路由做兼容（可选）
-		api.GET("/login/status", s.checkXHSLoginStatusHandler)
-		api.POST("/login", s.xhsLoginHandler)
-		protected := api.Group("/")
-		protected.Use(s.xhsAuthMiddleware())
-		{
-			protected.POST("/publish", s.xhsPublishHandler)
-		}
 	}
 
 	return router

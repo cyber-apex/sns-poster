@@ -25,12 +25,5 @@ KillSignal=SIGTERM
 LimitNOFILE=65536
 LimitNPROC=4096
 
-# Security settings
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/var/logs/sns-poster /opt/sns-poster /tmp
-
 [Install]
 WantedBy=multi-user.target
-Alias=sns-poster.service

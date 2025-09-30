@@ -179,19 +179,7 @@ pipeline {
             }
         }
         
-        unstable {
-            echo '⚠️ SNS Poster Pipeline completed with warnings!'
-            
-            // Notify on unstable build
-            script {
-                echo '⚠️ SNS Poster build completed with warnings - please review'
-                echo '📋 Check for:'
-                echo '  • Test failures'
-                echo '  • Linting warnings'
-                echo '  • Deprecated dependencies'
-            }
-        }
-        
+      
         always {
             echo '🧹 Cleaning up...'
             
