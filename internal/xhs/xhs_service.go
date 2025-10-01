@@ -4,12 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"sns-poster/internal/config"
 	"sns-poster/internal/utils"
 
-	"github.com/mattn/go-runewidth"
 	"github.com/sirupsen/logrus"
 )
 
@@ -113,23 +111,17 @@ func (s *Service) Close() {
 
 // PublishContent 发布内容
 func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
-	// 自动截取标题长度 - 小红书限制：最大40个显示单位
-	// CJK字符（中文/日文/韩文）占2个单位，英文/数字/符号占1个单位
-	originalWidth := runewidth.StringWidth(req.Title)
-	if originalWidth > 40 {
-		logrus.Warnf("标题长度超过限制 (%d > 40)，开始智能截取", originalWidth)
+	// 自动截取标题长度 - 小红书限制：最大20个字符
+	// 中文、英文、数字都按1个字符计算
+	titleRunes := []rune(req.Title)
+	originalLength := len(titleRunes)
+	if originalLength > 20 {
+		logrus.Warnf("标题长度超过限制 (%d > 20)，开始截取", originalLength)
 
-		// 使用runewidth进行精确截取，确保不超过40个显示单位
-		// 这会正确处理CJK字符的双宽度特性
-		truncated := runewidth.Truncate(req.Title, 40, "")
-		finalWidth := runewidth.StringWidth(truncated)
+		// 截取前20个字符
+		req.Title = string(titleRunes[:20])
 
-		originalRunes := len([]rune(req.Title))
-		req.Title = truncated
-		truncatedRunes := len([]rune(req.Title))
-
-		logrus.Infof("截取完成: %d字符 -> %d字符 (%d显示单位 -> %d显示单位)",
-			originalRunes, truncatedRunes, originalWidth, finalWidth)
+		logrus.Infof("截取完成: %d字符 -> %d字符", originalLength, 20)
 		logrus.Infof("截取后的标题: %s", req.Title)
 	}
 
@@ -142,41 +134,20 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 	// 设置处理后的图片路径
 	req.ImagePaths = imagePaths
 
+	page := s.getBrowser().NewPage()
+	defer page.Close()
+
+	publisher, err := NewPublisher(page)
+	if err != nil {
+		return nil, fmt.Errorf("创建发布器失败: %w", err)
+	}
+
 	// 执行发布
-	if err := s.publishContent(ctx, *req); err != nil {
-		return nil, err
-	}
-
-	response := &PublishResponse{
-		Title:   req.Title,
-		Content: req.Content,
-		Images:  len(imagePaths),
-		Status:  "发布完成",
-	}
-
-	return response, nil
+	return nil, publisher.Publish(ctx, *req)
 }
 
 // processImages 处理图片列表，支持URL下载和本地路径
 func (s *Service) processImages(images []string) ([]string, error) {
 	processor := utils.NewImageProcessor()
 	return processor.ProcessImages(images)
-}
-
-// publishContent 执行内容发布
-func (s *Service) publishContent(ctx context.Context, content PublishContent) error {
-	// 为发布操作创建更长的超时上下文（5分钟）
-	publishCtx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-	defer cancel()
-
-	page := s.getBrowser().NewPage()
-	defer page.Close()
-
-	publisher, err := NewPublisher(page)
-	if err != nil {
-		return fmt.Errorf("创建发布器失败: %w", err)
-	}
-
-	// 执行发布
-	return publisher.Publish(publishCtx, content)
 }

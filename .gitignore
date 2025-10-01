@@ -4,11 +4,18 @@ sns-poster
 sns-poster-*
 xhs-poster
 xhs-poster-bin
+tmp/
 
 # Runtime files
 cookies.json
 qrcode_login.png
 publish_page_debug.png
+debug/
+*.png
+
+# Air
+.air.toml.local
+build-errors.log
 
 # Development files
 *.zip
