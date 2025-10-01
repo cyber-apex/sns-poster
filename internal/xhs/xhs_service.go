@@ -27,15 +27,44 @@ func NewService(cfg *config.Config) *Service {
 	}
 }
 
-// getBrowser 获取或创建浏览器实例（懒加载）
+// getBrowser 获取或创建浏览器实例（懒加载 + 自动重连）
 func (s *Service) getBrowser() *utils.Browser {
 	s.browserMux.Lock()
 	defer s.browserMux.Unlock()
 
+	// 首次创建或重新连接
 	if s.browser == nil {
+		logrus.Info("创建新的浏览器连接...")
+		s.browser = utils.NewBrowser(s.config)
+		return s.browser
+	}
+
+	// 检查连接是否有效
+	if !s.isBrowserConnected() {
+		logrus.Warn("浏览器连接已断开，正在重新连接...")
+		s.browser.Close() // 清理旧连接
 		s.browser = utils.NewBrowser(s.config)
 	}
+
 	return s.browser
+}
+
+// isBrowserConnected 检查浏览器连接是否有效
+func (s *Service) isBrowserConnected() bool {
+	if s.browser == nil || s.browser.Browser == nil {
+		return false
+	}
+
+	// 尝试获取浏览器信息，如果失败说明连接已断开
+	defer func() {
+		if r := recover(); r != nil {
+			logrus.Debugf("浏览器连接检查失败: %v", r)
+		}
+	}()
+
+	// 尝试调用一个轻量级的操作来检测连接
+	_ = s.browser.Browser.GetContext()
+	return true
 }
 
 // LoginStatusResponse 登录状态响应
