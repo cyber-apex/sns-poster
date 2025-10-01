@@ -71,10 +71,6 @@ func (p *ImageProcessor) processImage(image string) (string, error) {
 // downloadImage 下载URL图片到 /tmp/xhs-poster
 func (p *ImageProcessor) downloadImage(url string) (string, error) {
 	imageURL := url
-	logrus.Infof("下载图片: %s", imageURL)
-
-	// URL编码处理
-	encodedURL := p.encodeURL(imageURL)
 
 	headers := map[string]string{
 		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -84,18 +80,20 @@ func (p *ImageProcessor) downloadImage(url string) (string, error) {
 	// 处理 Bandai Hobby CloudFront 图片
 	if strings.Contains(p.spiderName, "bandai_hobby") {
 		headers["Referer"] = "https://bandai-hobby.net/"
-		var err error
-		imageURL, err = p.signBandaiHobbyImage(imageURL)
+		signedURL, err := p.signBandaiHobbyImage(imageURL)
 		if err != nil {
 			logrus.Warnf("获取签名URL失败，尝试直接下载: %v", err)
+		} else {
+			imageURL = signedURL
 		}
-
-		logrus.Infof("使用 Bandai Hobby 签名URL下载")
 	}
 
+	logrus.Infof("下载图片: %s", imageURL)
+
 	// 创建HTTP请求
-	req, err := http.NewRequest("GET", encodedURL, nil)
+	req, err := http.NewRequest("GET", imageURL, nil)
 	if err != nil {
+		logrus.Warnf("创建请求失败: %v", err)
 		return "", err
 	}
 	for key, value := range headers {
@@ -174,19 +172,27 @@ func (p *ImageProcessor) getExtension(contentType string) string {
 
 // signBandaiHobbyImage 为 Bandai Hobby CloudFront 图片生成签名URL
 func (p *ImageProcessor) signBandaiHobbyImage(imageURL string) (string, error) {
-	// 解析URL获取路径
-	parsedURL, err := url.Parse(imageURL)
+	// extract path from imageURL
+	u, err := url.Parse(imageURL)
 	if err != nil {
 		return "", errors.Wrap(err, "解析URL失败")
 	}
-
-	path := url.QueryEscape(parsedURL.Path)
-	logrus.Infof("获取签名URL，路径: %s", path)
+	path := u.Path
 
 	// 调用签名服务
 	signURL := fmt.Sprintf("https://assets-signedurl.bandai-hobby.net/get-signed-url?path=%s", path)
 
-	resp, err := http.Get(signURL)
+	logrus.Infof("请求给Image URL签名: %s", signURL)
+
+	// request application/json
+	req, err := http.NewRequest("GET", signURL, nil)
+	if err != nil {
+		return "", errors.Wrap(err, "创建请求失败")
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 30 * time.Second}
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", errors.Wrap(err, "请求签名服务失败")
 	}
@@ -209,6 +215,6 @@ func (p *ImageProcessor) signBandaiHobbyImage(imageURL string) (string, error) {
 		return "", errors.New("签名URL为空")
 	}
 
-	logrus.Infof("获取签名URL成功")
+	logrus.Infof("获取签名URL成功 %s", result.SignedURL)
 	return result.SignedURL, nil
 }
