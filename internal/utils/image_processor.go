@@ -22,19 +22,16 @@ const downloadDir = "/tmp/xhs-poster"
 type ImageProcessor struct {
 	// 爬虫的URL
 	url string
-	// 爬虫的名称
-	spiderName string
 }
 
 // NewImageProcessor 创建图片处理器
-func NewImageProcessor(url, spiderName string) *ImageProcessor {
+func NewImageProcessor(url string) *ImageProcessor {
 	// 确保目录存在
 	if err := os.MkdirAll(downloadDir, 0755); err != nil {
 		logrus.Fatalf("创建目录失败: %v", err)
 	}
 	return &ImageProcessor{
-		url:        url,
-		spiderName: spiderName,
+		url: url,
 	}
 }
 
@@ -78,7 +75,8 @@ func (p *ImageProcessor) downloadImage(url string) (string, error) {
 	}
 
 	// 处理 Bandai Hobby CloudFront 图片
-	if strings.Contains(p.spiderName, "bandai_hobby") {
+	if strings.Contains(imageURL, "/hobby/jp") {
+		logrus.Infof("处理 Bandai Hobby CloudFront 图片: %s", imageURL)
 		headers["Referer"] = "https://bandai-hobby.net/"
 		signedURL, err := p.signBandaiHobbyImage(imageURL)
 		if err != nil {

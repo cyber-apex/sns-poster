@@ -153,9 +153,9 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 		logrus.Infof("截取完成: %d字符 -> %d字符", originalLength, 20)
 		logrus.Infof("截取后的标题: %s", req.Title)
 	}
-
+	logrus.Infof("处理图片: %v", req.URL)
 	// 处理图片：下载URL图片或使用本地路径
-	imagePaths, err := s.processImages(req.Images, req.URL, req.SpiderName)
+	imagePaths, err := s.processImages(req.Images, req.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 }
 
 // processImages 处理图片列表，支持URL下载和本地路径
-func (s *Service) processImages(images []string, url, spiderName string) ([]string, error) {
-	processor := utils.NewImageProcessor(url, spiderName)
+func (s *Service) processImages(images []string, url string) ([]string, error) {
+	processor := utils.NewImageProcessor(url)
 	return processor.ProcessImages(images)
 }

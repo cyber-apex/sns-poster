@@ -9,7 +9,7 @@ func TestDownloadCloudFrontImage(t *testing.T) {
 	// 测试下载 Bandai Hobby CloudFront 图片
 	imageURL := "https://d3bk8pkqsprcvh.cloudfront.net/hobby/jp/product/2025/09/zpBQsAENiJLiq8Pu/S7KlcbpaB2yDBRPO.jpeg"
 
-	processor := NewImageProcessor("https://bandai-hobby.net/item/01_5968/", "bandai_hobby")
+	processor := NewImageProcessor("https://bandai-hobby.net/item/01_5968/")
 
 	t.Logf("测试URL: %s", imageURL)
 
