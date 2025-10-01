@@ -66,12 +66,23 @@ func (p *ImageProcessor) downloadImage(imageURL string) (string, error) {
 	// URL编码处理
 	encodedURL := p.encodeURL(imageURL)
 
+	headers := map[string]string{
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+	}
+
+	// 处理CloudFront图片
+	if strings.Contains(imageURL, "cloudfront.net") {
+		headers["Referer"] = "https://bandai-hobby.net/"
+	}
+
 	// 创建HTTP请求
 	req, err := http.NewRequest("GET", encodedURL, nil)
 	if err != nil {
 		return "", err
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	for key, value := range headers {
+		req.Header.Set(key, value)
+	}
 
 	// 下载
 	client := &http.Client{Timeout: 30 * time.Second}
