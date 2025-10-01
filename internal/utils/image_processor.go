@@ -2,6 +2,7 @@ package utils
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,15 +19,23 @@ import (
 const downloadDir = "/tmp/xhs-poster"
 
 // ImageProcessor 图片处理器
-type ImageProcessor struct{}
+type ImageProcessor struct {
+	// 爬虫的URL
+	url string
+	// 爬虫的名称
+	spiderName string
+}
 
 // NewImageProcessor 创建图片处理器
-func NewImageProcessor() *ImageProcessor {
+func NewImageProcessor(url, spiderName string) *ImageProcessor {
 	// 确保目录存在
 	if err := os.MkdirAll(downloadDir, 0755); err != nil {
 		logrus.Fatalf("创建目录失败: %v", err)
 	}
-	return &ImageProcessor{}
+	return &ImageProcessor{
+		url:        url,
+		spiderName: spiderName,
+	}
 }
 
 // ProcessImages 处理图片列表（下载URL或使用本地路径）
@@ -60,19 +69,28 @@ func (p *ImageProcessor) processImage(image string) (string, error) {
 }
 
 // downloadImage 下载URL图片到 /tmp/xhs-poster
-func (p *ImageProcessor) downloadImage(imageURL string) (string, error) {
+func (p *ImageProcessor) downloadImage(url string) (string, error) {
+	imageURL := url
 	logrus.Infof("下载图片: %s", imageURL)
 
 	// URL编码处理
 	encodedURL := p.encodeURL(imageURL)
 
 	headers := map[string]string{
-		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+		"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+		"Referer":    p.url,
 	}
 
-	// 处理CloudFront图片
-	if strings.Contains(imageURL, "cloudfront.net") {
+	// 处理 Bandai Hobby CloudFront 图片
+	if strings.Contains(p.spiderName, "bandai_hobby") {
 		headers["Referer"] = "https://bandai-hobby.net/"
+		var err error
+		imageURL, err = p.signBandaiHobbyImage(imageURL)
+		if err != nil {
+			logrus.Warnf("获取签名URL失败，尝试直接下载: %v", err)
+		}
+
+		logrus.Infof("使用 Bandai Hobby 签名URL下载")
 	}
 
 	// 创建HTTP请求
@@ -152,4 +170,45 @@ func (p *ImageProcessor) getExtension(contentType string) string {
 	default:
 		return "jpg" // 默认JPG
 	}
+}
+
+// signBandaiHobbyImage 为 Bandai Hobby CloudFront 图片生成签名URL
+func (p *ImageProcessor) signBandaiHobbyImage(imageURL string) (string, error) {
+	// 解析URL获取路径
+	parsedURL, err := url.Parse(imageURL)
+	if err != nil {
+		return "", errors.Wrap(err, "解析URL失败")
+	}
+
+	path := url.QueryEscape(parsedURL.Path)
+	logrus.Infof("获取签名URL，路径: %s", path)
+
+	// 调用签名服务
+	signURL := fmt.Sprintf("https://assets-signedurl.bandai-hobby.net/get-signed-url?path=%s", path)
+
+	resp, err := http.Get(signURL)
+	if err != nil {
+		return "", errors.Wrap(err, "请求签名服务失败")
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("签名服务返回错误，状态码: %d", resp.StatusCode)
+	}
+
+	// 解析JSON响应
+	var result struct {
+		SignedURL string `json:"signedUrl"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", errors.Wrap(err, "解析签名响应失败")
+	}
+
+	if result.SignedURL == "" {
+		return "", errors.New("签名URL为空")
+	}
+
+	logrus.Infof("获取签名URL成功")
+	return result.SignedURL, nil
 }

@@ -155,7 +155,7 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 	}
 
 	// 处理图片：下载URL图片或使用本地路径
-	imagePaths, err := s.processImages(req.Images)
+	imagePaths, err := s.processImages(req.Images, req.URL, req.SpiderName)
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +176,7 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 }
 
 // processImages 处理图片列表，支持URL下载和本地路径
-func (s *Service) processImages(images []string) ([]string, error) {
-	processor := utils.NewImageProcessor()
+func (s *Service) processImages(images []string, url, spiderName string) ([]string, error) {
+	processor := utils.NewImageProcessor(url, spiderName)
 	return processor.ProcessImages(images)
 }

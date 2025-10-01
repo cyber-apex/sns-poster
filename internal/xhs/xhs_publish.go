@@ -21,6 +21,8 @@ type PublishContent struct {
 	Images     []string `json:"images" binding:"required,min=1"`
 	Tags       []string `json:"tags,omitempty"`
 	ImagePaths []string `json:"-"` // 处理后的图片路径
+	SpiderName string   `json:"spiderName,omitempty"`
+	URL        string   `json:"url,omitempty"`
 }
 
 // Publisher 小红书发布器
