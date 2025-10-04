@@ -248,6 +248,7 @@ func (p *Publisher) submitPublish(page *rod.Page, title, content string, tags []
 }
 
 func (p *Publisher) inputTags(contentElem *rod.Element, tags []string) {
+	logrus.Info("开始输入标签", "tags", tags)
 	if len(tags) == 0 {
 		return
 	}
