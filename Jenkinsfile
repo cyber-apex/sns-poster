@@ -131,6 +131,15 @@ pipeline {
             }
         }
 
+        stage("Deploy Remote Browser") {
+            steps {
+                echo 'Restarting Remote Browser...'
+                sh '''
+                docker restart $(docker ps -q --filter ancestor=ghcr.io/go-rod/rod
+                '''
+            }
+        }
+
         stage('Check') {
             steps {
                 echo 'Checking service status...'
