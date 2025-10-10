@@ -135,7 +135,7 @@ pipeline {
             steps {
                 echo 'Restarting Remote Browser...'
                 sh '''
-                docker restart $(docker ps -q --filter ancestor=ghcr.io/go-rod/rod
+                docker restart $(docker ps -q --filter ancestor=ghcr.io/go-rod/rod)
                 '''
             }
         }
