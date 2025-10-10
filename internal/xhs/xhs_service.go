@@ -8,6 +8,7 @@ import (
 	"sns-poster/internal/config"
 	"sns-poster/internal/utils"
 
+	"github.com/mattn/go-runewidth"
 	"github.com/sirupsen/logrus"
 )
 
@@ -140,17 +141,17 @@ func (s *Service) Close() {
 
 // PublishContent 发布内容
 func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
-	// 自动截取标题长度 - 小红书限制：最大20个字符
-	// 中文、英文、数字都按1个字符计算
-	titleRunes := []rune(req.Title)
-	originalLength := len(titleRunes)
-	if originalLength > 20 {
-		logrus.Warnf("标题长度超过限制 (%d > 20)，开始截取", originalLength)
+	const MaxRuneWidth = 40
+	// 自动截取标题长度 - 小红书限制：最大40个字符(中文2字符，英文1字符)
+	// 使用 runewidth 计算显示宽度（中文2字符，英文1字符）
+	originalWidth := runewidth.StringWidth(req.Title)
+	if originalWidth > MaxRuneWidth {
+		logrus.Warnf("标题长度超过限制 (%d > %d)，开始截取", originalWidth, MaxRuneWidth)
 
-		// 截取前20个字符
-		req.Title = string(titleRunes[:20])
+		// 截取到指定宽度
+		req.Title = runewidth.Truncate(req.Title, MaxRuneWidth, "")
 
-		logrus.Infof("截取完成: %d字符 -> %d字符", originalLength, 20)
+		logrus.Infof("截取完成: %d字符 -> %d字符", originalWidth, runewidth.StringWidth(req.Title))
 		logrus.Infof("截取后的标题: %s", req.Title)
 	}
 	logrus.Infof("处理图片: %v", req.URL)
