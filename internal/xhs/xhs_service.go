@@ -141,7 +141,7 @@ func (s *Service) Close() {
 
 // PublishContent 发布内容
 func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
-	const MaxRuneWidth = 40
+	const MaxRuneWidth = 38
 	// 自动截取标题长度 - 小红书限制：最大40个字符(中文2字符，英文1字符)
 	// 使用 runewidth 计算显示宽度（中文2字符，英文1字符）
 	originalWidth := runewidth.StringWidth(req.Title)
