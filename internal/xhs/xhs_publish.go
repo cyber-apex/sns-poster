@@ -118,6 +118,12 @@ func (p *Publisher) Publish(ctx context.Context, content PublishContent) error {
 		return errors.New("图片不能为空")
 	}
 
+	// 如果图片数量超过18张，截取前18张并记录日志
+	if len(content.ImagePaths) > 18 {
+		logrus.Warnf("图片数量超过限制 (%d > 18)，将只使用前18张图片", len(content.ImagePaths))
+		content.ImagePaths = content.ImagePaths[:18]
+	}
+
 	page := p.page.Context(ctx)
 
 	// 上传图片
