@@ -31,7 +31,9 @@ type Publisher struct {
 
 const (
 	// 直接进入图片发布模式
-	publishURL = `https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image`
+	publishURL    = `https://creator.xiaohongshu.com/publish/publish?source=official&from=menu&target=image`
+	MaxImageCount = 18
+	MaxImageSize  = 32 * 1024 * 1024 // 32MB
 )
 
 // debugScreenshot 保存调试截图
@@ -119,9 +121,9 @@ func (p *Publisher) Publish(ctx context.Context, content PublishContent) error {
 	}
 
 	// 如果图片数量超过18张，截取前18张并记录日志
-	if len(content.ImagePaths) > 18 {
-		logrus.Warnf("图片数量超过限制 (%d > 18)，将只使用前18张图片", len(content.ImagePaths))
-		content.ImagePaths = content.ImagePaths[:18]
+	if len(content.ImagePaths) > MaxImageCount {
+		logrus.Warnf("图片数量超过限制 (%d > %d)，将只使用前%d张图片", len(content.ImagePaths), MaxImageCount, MaxImageCount)
+		content.ImagePaths = content.ImagePaths[:MaxImageCount]
 	}
 
 	page := p.page.Context(ctx)
@@ -150,8 +152,8 @@ func (p *Publisher) uploadImages(page *rod.Page, imagesPaths []string) error {
 		}
 		logrus.Info("准备上传", "index", i+1, "path", path, "size_mb", float64(stat.Size())/1024/1024)
 
-		if stat.Size() > 20*1024*1024 {
-			return fmt.Errorf("图片过大: %.2fMB > 20MB", float64(stat.Size())/1024/1024)
+		if stat.Size() > MaxImageSize {
+			return fmt.Errorf("图片过大: %.2fMB > %dMB", float64(stat.Size())/1024/1024, MaxImageSize/1024/1024)
 		}
 	}
 
