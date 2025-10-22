@@ -26,10 +26,16 @@ type ImageProcessor struct {
 
 // NewImageProcessor 创建图片处理器
 func NewImageProcessor(url string) *ImageProcessor {
-	// 确保目录存在
-	if err := os.MkdirAll(downloadDir, 0755); err != nil {
+	// 确保目录存在，使用更宽松的权限
+	if err := os.MkdirAll(downloadDir, 0777); err != nil {
 		logrus.Fatalf("创建目录失败: %v", err)
 	}
+
+	// 尝试设置目录权限为所有用户可写
+	if err := os.Chmod(downloadDir, 0777); err != nil {
+		logrus.Warnf("设置目录权限失败: %v", err)
+	}
+
 	return &ImageProcessor{
 		url: url,
 	}
@@ -124,8 +130,14 @@ func (p *ImageProcessor) downloadImage(url string) (string, error) {
 	filename := fmt.Sprintf("img_%x.%s", hash, ext)
 	filePath := filepath.Join(downloadDir, filename)
 
-	if err := os.WriteFile(filePath, data, 0644); err != nil {
-		return "", err
+	if err := os.WriteFile(filePath, data, 0666); err != nil {
+		// 如果写入失败，尝试创建目录并重试
+		if err := os.MkdirAll(filepath.Dir(filePath), 0777); err != nil {
+			return "", errors.Wrap(err, "创建目录失败")
+		}
+		if err := os.WriteFile(filePath, data, 0666); err != nil {
+			return "", errors.Wrap(err, "写入文件失败")
+		}
 	}
 
 	logrus.Infof("图片已保存: %s (%d bytes)", filePath, len(data))

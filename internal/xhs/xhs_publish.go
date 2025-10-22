@@ -250,9 +250,7 @@ func (p *Publisher) submitPublish(page *rod.Page, title, content string, tags []
 		return fmt.Errorf("点击提交按钮失败: %w", err)
 	}
 
-	time.Sleep(3 * time.Second)
-
-	return nil
+	return p.waitPublishComplete(page)
 }
 
 func (p *Publisher) inputTags(contentElem *rod.Element, tags []string) {
@@ -312,4 +310,40 @@ func (p *Publisher) inputTag(contentElem *rod.Element, tag string) {
 	}
 
 	time.Sleep(500 * time.Millisecond)
+}
+
+func (p *Publisher) waitPublishComplete(page *rod.Page) error {
+	time.Sleep(2 * time.Second)
+
+	// debugScreenshot(page, "wait_publish_complete.png")
+
+	// find the toast element
+	hasToastElement, toastElement, err := page.Has(".d-new-toast")
+	logrus.Info("hasToastElement", hasToastElement)
+	if err != nil {
+		return fmt.Errorf("等待发布完成失败: %w", err)
+	}
+
+	if hasToastElement && toastElement != nil {
+		logrus.Info("toastElement", toastElement)
+		toastText := toastElement.MustText()
+		if toastText != "" {
+			logrus.Errorf("发布失败: %s", toastText)
+			return fmt.Errorf("发布失败: %s", toastText)
+		}
+	}
+
+	hasServerToast, serverToastElement, err := page.Has(".creator-publish-toast.error")
+	if err != nil {
+		return fmt.Errorf("等待发布完成失败: %w", err)
+	}
+	if hasServerToast && serverToastElement != nil {
+		logrus.Info("serverToastElement", serverToastElement)
+		serverToastText := serverToastElement.MustText()
+		if serverToastText != "" {
+			logrus.Errorf("发布失败: %s", serverToastText)
+			return fmt.Errorf("发布失败: %s", serverToastText)
+		}
+	}
+	return nil
 }

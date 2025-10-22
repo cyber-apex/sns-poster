@@ -19,6 +19,11 @@ type Service struct {
 	browserMux sync.Mutex
 }
 
+const (
+	MaxTitleRuneWidth   = 38
+	MaxContentRuneWidth = 1600
+)
+
 // NewService 创建小红书服务
 func NewService(cfg *config.Config) *Service {
 	config.InitConfig(cfg)
@@ -141,19 +146,29 @@ func (s *Service) Close() {
 
 // PublishContent 发布内容
 func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
-	const MaxRuneWidth = 38
 	// 自动截取标题长度 - 小红书限制：最大40个字符(中文2字符，英文1字符)
 	// 使用 runewidth 计算显示宽度（中文2字符，英文1字符）
 	originalWidth := runewidth.StringWidth(req.Title)
-	if originalWidth > MaxRuneWidth {
-		logrus.Warnf("标题长度超过限制 (%d > %d)，开始截取", originalWidth, MaxRuneWidth)
+	if originalWidth > MaxTitleRuneWidth {
+		logrus.Warnf("标题长度超过限制 (%d > %d)，开始截取", originalWidth, MaxTitleRuneWidth)
 
 		// 截取到指定宽度
-		req.Title = runewidth.Truncate(req.Title, MaxRuneWidth, "")
+		req.Title = runewidth.Truncate(req.Title, MaxTitleRuneWidth, "")
 
 		logrus.Infof("截取完成: %d字符 -> %d字符", originalWidth, runewidth.StringWidth(req.Title))
 		logrus.Infof("截取后的标题: %s", req.Title)
 	}
+
+	// 自动截取内容长度 - 小红书限制：最大2000个字符
+	// 使用 runewidth 计算显示宽度（中文2字符，英文1字符）
+	originalContentWidth := runewidth.StringWidth(req.Content)
+	if originalContentWidth > MaxContentRuneWidth {
+		logrus.Warnf("内容长度超过限制 (%d > %d)，开始截取", originalContentWidth, MaxContentRuneWidth)
+		req.Content = runewidth.Truncate(req.Content, MaxContentRuneWidth, "")
+
+		logrus.Infof("截取完成: %d字符 -> %d字符", originalContentWidth, runewidth.StringWidth(req.Content))
+	}
+
 	logrus.Infof("处理图片: %v", req.URL)
 	// 处理图片：下载URL图片或使用本地路径
 	imagePaths, err := s.processImages(req.Images, req.URL)
