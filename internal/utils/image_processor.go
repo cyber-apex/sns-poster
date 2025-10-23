@@ -26,7 +26,6 @@ type ImageProcessor struct {
 
 // NewImageProcessor 创建图片处理器
 func NewImageProcessor(url string) *ImageProcessor {
-	// 确保目录存在，使用更宽松的权限
 	if err := os.MkdirAll(downloadDir, 0755); err != nil {
 		logrus.Fatalf("创建目录失败: %v", err)
 	}
@@ -131,26 +130,6 @@ func (p *ImageProcessor) downloadImage(url string) (string, error) {
 
 	logrus.Infof("图片已保存: %s (%d bytes)", filePath, len(data))
 	return filePath, nil
-}
-
-// encodeURL 编码URL（处理中文和特殊字符）
-func (p *ImageProcessor) encodeURL(rawURL string) string {
-	parts := strings.Split(rawURL, "?")
-	if len(parts) == 1 {
-		return rawURL
-	}
-
-	// 重新编码查询参数
-	params := url.Values{}
-	for _, param := range strings.Split(parts[1], "&") {
-		kv := strings.SplitN(param, "=", 2)
-		if len(kv) == 2 {
-			value, _ := url.QueryUnescape(kv[1])
-			params.Set(kv[0], value)
-		}
-	}
-
-	return parts[0] + "?" + params.Encode()
 }
 
 // getExtension 根据Content-Type获取文件扩展名
