@@ -5,9 +5,9 @@ pipeline {
         PROJECT_NAME = 'sns-poster'
         BINARY_NAME = 'sns-poster'
         SERVICE_NAME = 'sns-poster.service'
-        // Use workspace subdirectory for Go modules and cache
-        GOCACHE = "${env.WORKSPACE}/.gocache"
-        GOMODCACHE = "${env.WORKSPACE}/.gomodcache"
+        // Use persistent cache directories outside workspace for faster builds
+        GOCACHE = "/var/lib/jenkins/.cache/go-build"
+        GOMODCACHE = "/var/lib/jenkins/.cache/go-mod"
     }
     
     stages {
@@ -25,23 +25,36 @@ pipeline {
                     # Add Go to PATH
                     export PATH=/usr/local/go/bin:$PATH
                     
-                    # Create cache directories in workspace
-                    mkdir -p ${WORKSPACE}/.gocache
-                    mkdir -p ${WORKSPACE}/.gomodcache
+                    # Create persistent cache directories (only if they don't exist)
+                    mkdir -p ${GOCACHE}
+                    mkdir -p ${GOMODCACHE}
                     
                     # Set Go environment variables
-                    export GOCACHE=${WORKSPACE}/.gocache
-                    export GOMODCACHE=${WORKSPACE}/.gomodcache
+                    export GOCACHE=${GOCACHE}
+                    export GOMODCACHE=${GOMODCACHE}
                     export CGO_ENABLED=0
                     
                     # Verify Go installation
                     go version
-                    go env GOCACHE
-                    go env GOMODCACHE
+                    echo "Using GOCACHE: $(go env GOCACHE)"
+                    echo "Using GOMODCACHE: $(go env GOMODCACHE)"
                     
-                    # Download dependencies
-                    go mod download
+                    # Check if go.sum changed (skip download if unchanged)
+                    if [ -f "${GOMODCACHE}/.last_build_${PROJECT_NAME}" ]; then
+                        if diff -q go.sum "${GOMODCACHE}/.last_build_${PROJECT_NAME}" > /dev/null 2>&1; then
+                            echo "✅ Dependencies unchanged, using cached modules"
+                        else
+                            echo "📦 Dependencies changed, downloading..."
+                            go mod download
+                        fi
+                    else
+                        echo "📦 First build or cache cleared, downloading dependencies..."
+                        go mod download
+                    fi
+                    
+                    # Verify and save checksum for next build
                     go mod verify
+                    cp go.sum "${GOMODCACHE}/.last_build_${PROJECT_NAME}"
                 '''
             }
         }
@@ -54,8 +67,8 @@ pipeline {
                     export PATH=/usr/local/go/bin:$PATH
                     
                     # Set Go environment variables
-                    export GOCACHE=${WORKSPACE}/.gocache
-                    export GOMODCACHE=${WORKSPACE}/.gomodcache
+                    export GOCACHE=${GOCACHE}
+                    export GOMODCACHE=${GOMODCACHE}
                     export GOOS=linux
                     export GOARCH=amd64
                     export CGO_ENABLED=0
@@ -84,8 +97,8 @@ pipeline {
                     export PATH=/usr/local/go/bin:$PATH
                     
                     # Set Go environment variables
-                    export GOCACHE=${WORKSPACE}/.gocache
-                    export GOMODCACHE=${WORKSPACE}/.gomodcache
+                    export GOCACHE=${GOCACHE}
+                    export GOMODCACHE=${GOMODCACHE}
                     export CGO_ENABLED=0
                     
                     echo "Running Go tests..."
@@ -194,16 +207,21 @@ pipeline {
             
             // Clean up workspace to save disk space
             script {
-                echo "Workspace size before cleanup: \$(du -sh \$WORKSPACE | cut -f1)"
+                echo "Workspace size: \$(du -sh \$WORKSPACE | cut -f1)"
                 
-                // Clean Go cache if it gets too large
+                // Clean old build cache (keep module cache intact for speed)
                 sh '''
-                    if [ -d "${WORKSPACE}/.gocache" ]; then
-                        find ${WORKSPACE}/.gocache -type f -atime +7 -delete 2>/dev/null || true
+                    # Only clean build cache older than 30 days to save space
+                    # Keep GOMODCACHE intact for fast dependency resolution
+                    if [ -d "${GOCACHE}" ]; then
+                        echo "Cleaning old build cache (30+ days)..."
+                        find ${GOCACHE} -type f -atime +30 -delete 2>/dev/null || true
                     fi
-                    if [ -d "${WORKSPACE}/.gomodcache" ]; then
-                        find ${WORKSPACE}/.gomodcache -type f -atime +7 -delete 2>/dev/null || true
-                    fi
+                    
+                    # Show cache sizes for monitoring
+                    echo "Cache sizes:"
+                    du -sh ${GOCACHE} 2>/dev/null || echo "GOCACHE not found"
+                    du -sh ${GOMODCACHE} 2>/dev/null || echo "GOMODCACHE not found"
                 '''
                 
                 echo "Cleanup completed"
