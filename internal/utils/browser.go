@@ -19,7 +19,7 @@ type Browser struct {
 	cookieManager *CookieManager
 }
 
-// restartRodContainer 重启 Rod Docker 容器
+// restartRodContainer 重启 Rod Docker 容器并等待其就绪
 func restartRodContainer() error {
 	logrus.Info("尝试重启 xhs-poster-rod Docker 容器...")
 
@@ -30,7 +30,12 @@ func restartRodContainer() error {
 		return err
 	}
 
-	logrus.Info("xhs-poster-rod Docker 容器重启成功")
+	logrus.Info("xhs-poster-rod Docker 容器重启成功，等待容器就绪...")
+
+	// 等待容器启动 (通常需要几秒钟)
+	time.Sleep(5 * time.Second)
+
+	logrus.Info("容器应该已就绪")
 	return nil
 }
 
@@ -107,15 +112,14 @@ func NewBrowser(cfg *config.Config) *Browser {
 		resultChan <- result{browser, nil}
 	}()
 
+	// 创建cookie管理器（只创建一次，所有分支共享）
+	cookieManager := NewCookieManager()
+
 	// 等待连接结果或超时
 	select {
 	case res := <-resultChan:
 		if res.browser != nil {
 			logrus.Info("浏览器连接成功")
-
-			// 创建cookie管理器
-			cookieManager := NewCookieManager()
-
 			return &Browser{
 				Browser:       res.browser,
 				launcher:      l,
@@ -123,21 +127,45 @@ func NewBrowser(cfg *config.Config) *Browser {
 			}
 		}
 
-		// 尝试重启 Rod 容器
+		// 初始化阶段连接失败，尝试重启容器并重试一次
+		logrus.Warn("初始连接失败，尝试重启 Rod 容器并重试...")
 		if err := restartRodContainer(); err != nil {
-			logrus.Errorf("重启 Rod 容器失败: %v", err)
+			logrus.Fatal("重启 Rod 容器失败，无法继续初始化")
 		}
 
-		logrus.Panic("浏览器连接失败，已尝试重启 Rod 容器")
-		return nil
+		// 重试连接
+		logrus.Info("重新尝试连接到远程浏览器...")
+		browser := rod.New().Client(l.MustClient())
+		if err := browser.Connect(); err != nil {
+			logrus.Fatalf("重启后仍无法连接到浏览器: %v", err)
+		}
+
+		logrus.Info("重启后浏览器连接成功")
+		return &Browser{
+			Browser:       browser,
+			launcher:      l,
+			cookieManager: cookieManager,
+		}
 
 	case <-connectCtx.Done():
-		// 尝试重启 Rod 容器
+		// 初始化阶段超时，尝试重启容器
+		logrus.Warn("连接超时，尝试重启 Rod 容器...")
 		if err := restartRodContainer(); err != nil {
-			logrus.Errorf("重启 Rod 容器失败: %v", err)
+			logrus.Fatal("重启 Rod 容器失败，无法继续初始化")
 		}
 
-		logrus.Panic("浏览器连接超时(10秒)，已尝试重启 Rod 容器")
-		return nil
+		// 重试连接（不设置超时，因为刚重启）
+		logrus.Info("重新尝试连接到远程浏览器...")
+		browser := rod.New().Client(l.MustClient())
+		if err := browser.Connect(); err != nil {
+			logrus.Fatalf("重启后仍无法连接到浏览器: %v", err)
+		}
+
+		logrus.Info("重启后浏览器连接成功")
+		return &Browser{
+			Browser:       browser,
+			launcher:      l,
+			cookieManager: cookieManager,
+		}
 	}
 }
