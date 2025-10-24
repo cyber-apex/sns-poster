@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"os/exec"
 	"time"
 
 	"sns-poster/internal/config"
@@ -18,13 +19,34 @@ type Browser struct {
 	cookieManager *CookieManager
 }
 
+// restartRodContainer 重启 Rod Docker 容器
+func restartRodContainer() error {
+	logrus.Info("尝试重启 xhs-poster-rod Docker 容器...")
+
+	// 重启 rod 容器
+	cmd := exec.Command("docker", "restart", "xhs-poster-rod")
+	if err := cmd.Run(); err != nil {
+		logrus.Errorf("重启 xhs-poster-rod 容器失败: %v", err)
+		return err
+	}
+
+	logrus.Info("xhs-poster-rod Docker 容器重启成功")
+	return nil
+}
+
 // NewPage 创建新页面并自动加载cookies
 func (b *Browser) NewPage() *rod.Page {
 	// 检查浏览器连接是否有效
 	defer func() {
 		if r := recover(); r != nil {
 			logrus.Errorf("创建页面失败: %v", r)
-			logrus.Fatal("浏览器连接已断开，请重启应用")
+
+			// 尝试重启 Rod 容器
+			if err := restartRodContainer(); err != nil {
+				logrus.Errorf("重启 Rod 容器失败: %v", err)
+			}
+
+			logrus.Panic("浏览器连接已断开，已尝试重启 Rod 容器")
 		}
 	}()
 
@@ -100,11 +122,22 @@ func NewBrowser(cfg *config.Config) *Browser {
 				cookieManager: cookieManager,
 			}
 		}
-		logrus.Fatal("浏览器连接失败")
+
+		// 尝试重启 Rod 容器
+		if err := restartRodContainer(); err != nil {
+			logrus.Errorf("重启 Rod 容器失败: %v", err)
+		}
+
+		logrus.Panic("浏览器连接失败，已尝试重启 Rod 容器")
 		return nil
 
 	case <-connectCtx.Done():
-		logrus.Fatal("浏览器连接超时(10秒)，请确保Rod管理器已启动: docker ps | grep rod")
+		// 尝试重启 Rod 容器
+		if err := restartRodContainer(); err != nil {
+			logrus.Errorf("重启 Rod 容器失败: %v", err)
+		}
+
+		logrus.Panic("浏览器连接超时(10秒)，已尝试重启 Rod 容器")
 		return nil
 	}
 }

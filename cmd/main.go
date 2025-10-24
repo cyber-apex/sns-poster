@@ -112,12 +112,4 @@ func logServerStartupInfo() {
 	logrus.Info("  • GET  /api/v1/xhs/login/status - 检查XHS登录状态")
 	logrus.Info("  • POST /api/v1/xhs/login - XHS手动登录")
 	logrus.Info("  • POST /api/v1/xhs/publish - XHS发布内容 (需要登录)")
-	logrus.Info("")
-	logrus.Info("🔐 自动登录:")
-	logrus.Info("  访问 /api/v1/xhs/publish 将自动触发登录流程")
-	logrus.Info("  首次访问时会在终端显示二维码供扫码登录")
-	logrus.Info("")
-	logrus.Info("🧪 测试脚本:")
-	logrus.Info("  ./quick_test_post.sh - 快速测试")
-	logrus.Info("========================================")
 }
