@@ -106,10 +106,4 @@ func logServerStartupInfo() {
 	logrus.Info("🚀 SNS Notify HTTP服务已启动")
 	logrus.Info("========================================")
 	logrus.Info("📡 HTTP API: http://localhost:6170")
-	logrus.Info("🏥 健康检查: http://localhost:6170/health")
-	logrus.Info("")
-	logrus.Info("📝 API端点:")
-	logrus.Info("  • GET  /api/v1/xhs/login/status - 检查XHS登录状态")
-	logrus.Info("  • POST /api/v1/xhs/login - XHS手动登录")
-	logrus.Info("  • POST /api/v1/xhs/publish - XHS发布内容 (需要登录)")
 }
