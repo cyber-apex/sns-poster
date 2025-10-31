@@ -42,22 +42,9 @@ pipeline {
                     echo "Using GOCACHE: $(go env GOCACHE)"
                     echo "Using GOMODCACHE: $(go env GOMODCACHE)"
                     
-                    # Check if go.sum changed (skip download if unchanged)
-                    if [ -f "${GOMODCACHE}/.last_build_${PROJECT_NAME}" ]; then
-                        if diff -q go.sum "${GOMODCACHE}/.last_build_${PROJECT_NAME}" > /dev/null 2>&1; then
-                            echo "✅ Dependencies unchanged, using cached modules"
-                        else
-                            echo "📦 Dependencies changed, downloading..."
-                            go mod download
-                        fi
-                    else
-                        echo "📦 First build or cache cleared, downloading dependencies..."
-                        go mod download
-                    fi
-                    
-                    # Verify and save checksum for next build
+                    # Download dependencies (will use cache if available)
+                    go mod download
                     go mod verify
-                    cp go.sum "${GOMODCACHE}/.last_build_${PROJECT_NAME}"
                 '''
             }
         }
@@ -67,17 +54,14 @@ pipeline {
                 echo 'Building SNS Poster for Linux AMD64...'
                 sh '''
                     export PATH=/usr/local/go/bin:${GOBIN}:$PATH
-                    
-                    # Create persistent cache directories
-                    mkdir -p ${GOCACHE}
-                    mkdir -p ${GOMODCACHE}
-                    mkdir -p ${GOBIN}
-                    
                     # Set Go environment variables
                     export GOCACHE=${GOCACHE}
                     export GOMODCACHE=${GOMODCACHE}
                     export GOBIN=${GOBIN}
                     export CGO_ENABLED=0
+
+                    go version
+
                     
                     echo "Building binary..."
                     mkdir -p bin
@@ -97,11 +81,6 @@ pipeline {
                 echo 'Running tests...'
                 sh '''
                     export PATH=/usr/local/go/bin:${GOBIN}:$PATH
-                    
-                    # Create persistent cache directories
-                    mkdir -p ${GOCACHE}
-                    mkdir -p ${GOMODCACHE}
-                    mkdir -p ${GOBIN}
                     
                     # Set Go environment variables
                     export GOCACHE=${GOCACHE}
