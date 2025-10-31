@@ -207,7 +207,7 @@ func (s *HTTPServer) respondError(c *gin.Context, statusCode int, code, message 
 			}
 		}()
 		payload := map[string]string{
-			"content": fmt.Sprintf("XHS发布失败: %s", message),
+			"content": fmt.Sprintf("XHS发布失败: %s\n %s", message, details),
 		}
 		jsonData, err := json.Marshal(payload)
 		if err != nil {
