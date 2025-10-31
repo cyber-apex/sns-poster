@@ -1,7 +1,10 @@
 package server
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -195,6 +198,32 @@ func (s *HTTPServer) respondError(c *gin.Context, statusCode int, code, message 
 		"message":     message,
 		"details":     details,
 	}).Errorf("API请求失败: %s", message)
+
+	// send notify to wecom regardless of sucess for failure, make sure it executes before exiting the function
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logrus.Errorf("发送通知失败: %v", r)
+			}
+		}()
+		payload := map[string]string{
+			"content": fmt.Sprintf("XHS发布失败: %s", message),
+		}
+		jsonData, err := json.Marshal(payload)
+		if err != nil {
+			logrus.Errorf("JSON编码失败: %v", err)
+			return
+		}
+
+		resp, err := http.Post("http://localhost:6181/api/v1/notify/wecom", "application/json", bytes.NewReader(jsonData))
+		if err != nil {
+			logrus.Errorf("发送通知失败: %v", err)
+		}
+		if resp.StatusCode != http.StatusOK {
+			logrus.Errorf("发送通知失败: %v", resp.StatusCode)
+		}
+		defer resp.Body.Close()
+	}()
 
 	c.JSON(statusCode, response)
 }
