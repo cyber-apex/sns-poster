@@ -5,9 +5,11 @@ pipeline {
         PROJECT_NAME = 'sns-poster'
         BINARY_NAME = 'sns-poster'
         SERVICE_NAME = 'sns-poster.service'
-        // Use persistent cache directories outside workspace for faster builds
-        GOCACHE = "/var/lib/jenkins/.cache/go-build"
-        GOMODCACHE = "/var/lib/jenkins/.cache/go-mod"
+        // Use workspace subdirectory for Go modules and cache
+        CACHE_BASE = "/var/lib/jenkins/${PROJECT_NAME}/.cache"
+        GOCACHE = "/var/lib/jenkins/${PROJECT_NAME}/.cache/go-build"
+        GOMODCACHE = "/var/lib/jenkins/${PROJECT_NAME}/.cache/go-mod"
+        GOBIN = "/var/lib/jenkins/${PROJECT_NAME}/.cache/go-bin"
     }
     
     stages {
@@ -22,16 +24,17 @@ pipeline {
             steps {
                 echo 'Setting up Go environment...'
                 sh '''
-                    # Add Go to PATH
-                    export PATH=/usr/local/go/bin:$PATH
+                    export PATH=/usr/local/go/bin:${GOBIN}:$PATH
                     
-                    # Create persistent cache directories (only if they don't exist)
+                    # Create persistent cache directories
                     mkdir -p ${GOCACHE}
                     mkdir -p ${GOMODCACHE}
+                    mkdir -p ${GOBIN}
                     
                     # Set Go environment variables
                     export GOCACHE=${GOCACHE}
                     export GOMODCACHE=${GOMODCACHE}
+                    export GOBIN=${GOBIN}
                     export CGO_ENABLED=0
                     
                     # Verify Go installation
@@ -63,18 +66,18 @@ pipeline {
             steps {
                 echo 'Building SNS Poster for Linux AMD64...'
                 sh '''
-                    # Add Go to PATH
-                    export PATH=/usr/local/go/bin:$PATH
+                    export PATH=/usr/local/go/bin:${GOBIN}:$PATH
+                    
+                    # Create persistent cache directories
+                    mkdir -p ${GOCACHE}
+                    mkdir -p ${GOMODCACHE}
+                    mkdir -p ${GOBIN}
                     
                     # Set Go environment variables
                     export GOCACHE=${GOCACHE}
                     export GOMODCACHE=${GOMODCACHE}
-                    export GOOS=linux
-                    export GOARCH=amd64
+                    export GOBIN=${GOBIN}
                     export CGO_ENABLED=0
-
-                    echo "Go version:"
-                    go version
                     
                     echo "Building binary..."
                     mkdir -p bin
@@ -93,12 +96,17 @@ pipeline {
             steps {
                 echo 'Running tests...'
                 sh '''
-                    # Add Go to PATH
-                    export PATH=/usr/local/go/bin:$PATH
+                    export PATH=/usr/local/go/bin:${GOBIN}:$PATH
+                    
+                    # Create persistent cache directories
+                    mkdir -p ${GOCACHE}
+                    mkdir -p ${GOMODCACHE}
+                    mkdir -p ${GOBIN}
                     
                     # Set Go environment variables
                     export GOCACHE=${GOCACHE}
                     export GOMODCACHE=${GOMODCACHE}
+                    export GOBIN=${GOBIN}
                     export CGO_ENABLED=0
                     
                     echo "Running Go tests..."
