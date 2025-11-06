@@ -1,10 +1,7 @@
 package server
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -111,6 +108,10 @@ func (s *HTTPServer) setupRoutes() *gin.Engine {
 	// 健康检查
 	router.GET("/health", s.healthHandler)
 
+	// 长任务
+	router.GET("/test/long-running-task", s.longRunningTaskHandler)
+	router.GET("/test/error-response", s.errorResponseTestHandler)
+
 	// API 路由组
 	api := router.Group("/api/v1")
 	{
@@ -199,31 +200,32 @@ func (s *HTTPServer) respondError(c *gin.Context, statusCode int, code, message 
 		"details":     details,
 	}).Errorf("API请求失败: %s", message)
 
-	// send notify to wecom regardless of sucess for failure, make sure it executes before exiting the function
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logrus.Errorf("发送通知失败: %v", r)
-			}
-		}()
-		payload := map[string]string{
-			"content": fmt.Sprintf("XHS发布失败: %s\n %s", message, details),
-		}
-		jsonData, err := json.Marshal(payload)
-		if err != nil {
-			logrus.Errorf("JSON编码失败: %v", err)
-			return
-		}
+	// TODO: delete
+	// // send notify to wecom regardless of sucess for failure, make sure it executes before exiting the function
+	// go func() {
+	// 	defer func() {
+	// 		if r := recover(); r != nil {
+	// 			logrus.Errorf("发送通知失败: %v", r)
+	// 		}
+	// 	}()
+	// 	payload := map[string]string{
+	// 		"content": fmt.Sprintf("XHS发布失败: %s\n %s", message, details),
+	// 	}
+	// 	jsonData, err := json.Marshal(payload)
+	// 	if err != nil {
+	// 		logrus.Errorf("JSON编码失败: %v", err)
+	// 		return
+	// 	}
 
-		resp, err := http.Post("http://localhost:6181/api/v1/notify/wecom", "application/json", bytes.NewReader(jsonData))
-		if err != nil {
-			logrus.Errorf("发送通知失败: %v", err)
-		}
-		if resp.StatusCode != http.StatusOK {
-			logrus.Errorf("发送通知失败: %v", resp.StatusCode)
-		}
-		defer resp.Body.Close()
-	}()
+	// 	resp, err := http.Post("http://localhost:6181/api/v1/notify/wecom", "application/json", bytes.NewReader(jsonData))
+	// 	if err != nil {
+	// 		logrus.Errorf("发送通知失败: %v", err)
+	// 	}
+	// 	if resp.StatusCode != http.StatusOK {
+	// 		logrus.Errorf("发送通知失败: %v", resp.StatusCode)
+	// 	}
+	// 	defer resp.Body.Close()
+	// }()
 
 	c.JSON(statusCode, response)
 }
@@ -272,6 +274,22 @@ func (s *HTTPServer) healthHandler(c *gin.Context) {
 		"service":   "sns-poster",
 		"timestamp": time.Now().Unix(),
 	}, "服务正常")
+}
+
+func (s *HTTPServer) longRunningTaskHandler(c *gin.Context) {
+	time.Sleep(20 * time.Second)
+
+	s.respondSuccess(c, map[string]any{
+		"status":    "completed",
+		"service":   "sns-poster",
+		"message":   "长任务完成",
+		"timestamp": time.Now().Unix(),
+	}, "长任务完成")
+}
+
+func (s *HTTPServer) errorResponseTestHandler(c *gin.Context) {
+	s.respondError(c, http.StatusInternalServerError, "ERROR_TEST",
+		"错误测试", "错误测试详情")
 }
 
 // checkXHSLoginStatusHandler 检查XHS登录状态
