@@ -20,8 +20,10 @@ type Service struct {
 }
 
 const (
-	MaxTitleRuneWidth   = 38
-	MaxContentRuneWidth = 1600
+	// 标题最大长度（中文2字符，英文1字符, \n 算2个字符）
+	MaxTitleRuneWidth = 38
+	// 内容最大长度（中文2字符，英文1字符, \n 算2个字符）
+	MaxContentRuneWidth = 1200
 )
 
 // NewService 创建小红书服务
