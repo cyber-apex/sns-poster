@@ -1,42 +1,42 @@
-# Build artifacts
-bin/
-sns-poster
-sns-poster-*
-xhs-poster
-xhs-poster-bin
-tmp/
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
 
-# Runtime files
-cookies.json
-qrcode_login.png
-publish_page_debug.png
-debug/
-*.png
+# Test binary, built with `go test -c`
+*.test
 
-# Air
-.air.toml.local
-build-errors.log
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
 
-# Development files
-*.zip
-*.tar.gz
+# Go workspace file
+go.work
 
-# CI/CD artifacts
-coverage.out
-coverage.html
-gosec-report.json
-release/
+# Dependency directories
+vendor/
 
-# Go cache directories (Jenkins)
-.gocache/
-.gomodcache/
-
-# IDE files
+# IDE specific files
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# OS files
+# OS specific files
 .DS_Store
 Thumbs.db
+
+# Application specific
+cookies.json
+cookies/
+tmp/
+logs/
+*.log
+
+# Build artifacts
+sns-poster
+bin/
+dist/
+debug/

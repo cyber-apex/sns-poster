@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -128,6 +129,10 @@ func (s *HTTPServer) setupRoutes() *gin.Engine {
 			{
 				protected.POST("/publish", s.xhsPublishHandler)
 			}
+
+			// 浏览器池管理路由
+			xhs.GET("/browsers", s.getBrowsersHandler)
+			xhs.DELETE("/browsers/:account_id", s.closeBrowserHandler)
 		}
 	}
 
@@ -245,8 +250,11 @@ func (s *HTTPServer) respondSuccess(c *gin.Context, data any, message string) {
 // xhsAuthMiddleware XHS认证中间件 - 自动触发登录
 func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 获取账号ID（从query或body）
+		accountID := s.getAccountID(c)
+
 		// 检查XHS登录状态
-		status, err := s.xhsService.CheckLoginStatus(c.Request.Context())
+		status, err := s.xhsService.CheckLoginStatus(c.Request.Context(), accountID)
 		if err != nil {
 			s.respondError(c, http.StatusInternalServerError, "XHS_AUTH_CHECK_FAILED",
 				"无法验证XHS登录状态", err.Error())
@@ -255,7 +263,7 @@ func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 		}
 
 		if !status.IsLoggedIn {
-			logrus.Info("XHS用户未登录，发布器将在需要时处理登录流程")
+			logrus.Infof("XHS用户未登录 [账号: %s]，发布器将在需要时处理登录流程", accountID)
 			// 不在中间件中强制登录，让发布器根据实际情况处理
 			// 这样可以确保登录和发布在同一个浏览器会话中进行
 		}
@@ -263,6 +271,7 @@ func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 		// 将用户信息存储在上下文中
 		c.Set("xhs_username", status.Username)
 		c.Set("xhs_is_logged_in", status.IsLoggedIn)
+		c.Set("xhs_account_id", accountID)
 		c.Next()
 	}
 }
@@ -292,21 +301,46 @@ func (s *HTTPServer) errorResponseTestHandler(c *gin.Context) {
 		"错误测试", "错误测试详情")
 }
 
+// getAccountID 从请求中获取账号ID（支持query参数和请求体）
+func (s *HTTPServer) getAccountID(c *gin.Context) string {
+	// 优先从query参数获取
+	accountID := c.Query("account_id")
+	if accountID != "" {
+		return accountID
+	}
+
+	// 如果是POST请求，尝试从请求体获取（需要先读取一次）
+	// 但为了简化，我们主要使用query参数
+	// 如果没有指定accountID，使用空字符串（默认账号）
+	return ""
+}
+
 // checkXHSLoginStatusHandler 检查XHS登录状态
 func (s *HTTPServer) checkXHSLoginStatusHandler(c *gin.Context) {
-	status, err := s.xhsService.CheckLoginStatus(c.Request.Context())
+	accountID := s.getAccountID(c)
+
+	status, err := s.xhsService.CheckLoginStatus(c.Request.Context(), accountID)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_STATUS_CHECK_FAILED",
 			"检查XHS登录状态失败", err.Error())
 		return
 	}
 
-	s.respondSuccess(c, status, "检查XHS登录状态成功")
+	// 添加账号信息到响应
+	response := map[string]any{
+		"is_logged_in": status.IsLoggedIn,
+		"username":     status.Username,
+		"account_id":   accountID,
+	}
+
+	s.respondSuccess(c, response, "检查XHS登录状态成功")
 }
 
 // xhsLoginHandler XHS登录处理
 func (s *HTTPServer) xhsLoginHandler(c *gin.Context) {
-	result, err := s.xhsService.Login(c.Request.Context())
+	accountID := s.getAccountID(c)
+
+	result, err := s.xhsService.Login(c.Request.Context(), accountID)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_LOGIN_FAILED",
 			"XHS登录失败", err.Error())
@@ -331,18 +365,54 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 		return
 	}
 
-	// 从上下文获取XHS用户信息
+	// 从上下文获取XHS用户信息和账号ID
 	username, _ := c.Get("xhs_username")
-	logrus.Infof("XHS用户 %v 请求发布内容: %s", username, req.Title)
+	accountID, _ := c.Get("xhs_account_id")
+	accountIDStr, _ := accountID.(string)
+
+	logrus.Infof("XHS用户 %v [账号: %s] 请求发布内容: %s", username, accountIDStr, req.Title)
 
 	// 执行XHS发布
-	result, err := s.xhsService.PublishContent(c.Request.Context(), &req)
+	result, err := s.xhsService.PublishContent(c.Request.Context(), accountIDStr, &req)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_PUBLISH_FAILED",
 			"XHS发布失败", err.Error())
 		return
 	}
 
-	logrus.Infof("XHS用户 %v 发布内容成功: %s", username, req.Title)
+	logrus.Infof("XHS用户 %v [账号: %s] 发布内容成功: %s", username, accountIDStr, req.Title)
 	s.respondSuccess(c, result, "XHS发布成功")
+}
+
+// getBrowsersHandler 获取浏览器池状态
+func (s *HTTPServer) getBrowsersHandler(c *gin.Context) {
+	activeAccounts := s.xhsService.GetActiveAccounts()
+	activeBrowserCount := s.xhsService.GetActiveBrowserCount()
+
+	response := map[string]any{
+		"active_browsers": activeBrowserCount,
+		"active_accounts": activeAccounts,
+	}
+
+	s.respondSuccess(c, response, "获取浏览器池状态成功")
+}
+
+// closeBrowserHandler 关闭指定账号的浏览器
+func (s *HTTPServer) closeBrowserHandler(c *gin.Context) {
+	accountID := c.Param("account_id")
+
+	if accountID == "" {
+		s.respondError(c, http.StatusBadRequest, "INVALID_ACCOUNT_ID",
+			"账号ID不能为空", nil)
+		return
+	}
+
+	s.xhsService.CloseBrowser(accountID)
+
+	response := map[string]any{
+		"account_id": accountID,
+		"closed":     true,
+	}
+
+	s.respondSuccess(c, response, fmt.Sprintf("账号 %s 的浏览器已关闭", accountID))
 }

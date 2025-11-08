@@ -17,6 +17,7 @@ type Browser struct {
 	*rod.Browser
 	launcher      *launcher.Launcher
 	cookieManager *CookieManager
+	accountID     string
 }
 
 // restartRodContainer 重启 Rod Docker 容器并等待其就绪
@@ -78,8 +79,18 @@ func (b *Browser) Close() {
 }
 
 // NewBrowser 创建浏览器实例（硬编码配置）
+// 使用空的accountID（默认账号）
 func NewBrowser(cfg *config.Config) *Browser {
-	logrus.Info("初始化浏览器管理器...")
+	return NewBrowserWithAccount(cfg, "")
+}
+
+// NewBrowserWithAccount 创建带账号标识的浏览器实例
+func NewBrowserWithAccount(cfg *config.Config, accountID string) *Browser {
+	if accountID != "" {
+		logrus.Infof("初始化浏览器管理器 [账号: %s]...", accountID)
+	} else {
+		logrus.Info("初始化浏览器管理器 [默认账号]...")
+	}
 
 	// 硬编码使用管理器模式
 	l := launcher.MustNewManaged("")
@@ -112,8 +123,8 @@ func NewBrowser(cfg *config.Config) *Browser {
 		resultChan <- result{browser, nil}
 	}()
 
-	// 创建cookie管理器（只创建一次，所有分支共享）
-	cookieManager := NewCookieManager()
+	// 创建账号特定的cookie管理器
+	cookieManager := NewCookieManager(accountID)
 
 	// 等待连接结果或超时
 	select {
@@ -124,6 +135,7 @@ func NewBrowser(cfg *config.Config) *Browser {
 				Browser:       res.browser,
 				launcher:      l,
 				cookieManager: cookieManager,
+				accountID:     accountID,
 			}
 		}
 
@@ -145,6 +157,7 @@ func NewBrowser(cfg *config.Config) *Browser {
 			Browser:       browser,
 			launcher:      l,
 			cookieManager: cookieManager,
+			accountID:     accountID,
 		}
 
 	case <-connectCtx.Done():
@@ -166,6 +179,12 @@ func NewBrowser(cfg *config.Config) *Browser {
 			Browser:       browser,
 			launcher:      l,
 			cookieManager: cookieManager,
+			accountID:     accountID,
 		}
 	}
+}
+
+// GetAccountID 获取浏览器关联的账号ID
+func (b *Browser) GetAccountID() string {
+	return b.accountID
 }

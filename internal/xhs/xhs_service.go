@@ -3,7 +3,6 @@ package xhs
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"sns-poster/internal/config"
 	"sns-poster/internal/utils"
@@ -14,9 +13,8 @@ import (
 
 // Service 小红书服务
 type Service struct {
-	config     *config.Config
-	browser    *utils.Browser
-	browserMux sync.Mutex
+	config      *config.Config
+	browserPool *utils.BrowserPool
 }
 
 const (
@@ -28,49 +26,14 @@ const (
 func NewService(cfg *config.Config) *Service {
 	config.InitConfig(cfg)
 	return &Service{
-		config: cfg,
-		// 不在这里创建浏览器，延迟到首次使用
+		config:      cfg,
+		browserPool: utils.NewBrowserPool(cfg),
 	}
 }
 
-// getBrowser 获取或创建浏览器实例（懒加载 + 自动重连）
-func (s *Service) getBrowser() *utils.Browser {
-	s.browserMux.Lock()
-	defer s.browserMux.Unlock()
-
-	// 首次创建或重新连接
-	if s.browser == nil {
-		logrus.Info("创建新的浏览器连接...")
-		s.browser = utils.NewBrowser(s.config)
-		return s.browser
-	}
-
-	// 检查连接是否有效
-	if !s.isBrowserConnected() {
-		logrus.Warn("浏览器连接已断开，正在重新连接...")
-		s.browser.Close() // 清理旧连接
-		s.browser = utils.NewBrowser(s.config)
-	}
-
-	return s.browser
-}
-
-// isBrowserConnected 检查浏览器连接是否有效
-func (s *Service) isBrowserConnected() bool {
-	if s.browser == nil || s.browser.Browser == nil {
-		return false
-	}
-
-	// 尝试获取浏览器信息，如果失败说明连接已断开
-	defer func() {
-		if r := recover(); r != nil {
-			logrus.Debugf("浏览器连接检查失败: %v", r)
-		}
-	}()
-
-	// 尝试调用一个轻量级的操作来检测连接
-	_ = s.browser.Browser.GetContext()
-	return true
+// getBrowser 获取指定账号的浏览器实例
+func (s *Service) getBrowser(accountID string) *utils.Browser {
+	return s.browserPool.GetBrowser(accountID)
 }
 
 // LoginStatusResponse 登录状态响应
@@ -94,8 +57,8 @@ type PublishResponse struct {
 }
 
 // CheckLoginStatus 检查登录状态
-func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, error) {
-	page := s.getBrowser().NewPage()
+func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*LoginStatusResponse, error) {
+	page := s.getBrowser(accountID).NewPage()
 	defer page.Close()
 
 	loginAction := NewLogin(page)
@@ -114,8 +77,8 @@ func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, e
 }
 
 // Login 登录到小红书
-func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
-	page := s.getBrowser().NewPage()
+func (s *Service) Login(ctx context.Context, accountID string) (*LoginResponse, error) {
+	page := s.getBrowser(accountID).NewPage()
 	defer page.Close()
 
 	loginAction := NewLogin(page)
@@ -138,14 +101,29 @@ func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 
 // Close 关闭服务
 func (s *Service) Close() {
-	if s.browser != nil {
-		s.browser.Close()
+	if s.browserPool != nil {
+		s.browserPool.CloseAll()
 		logrus.Info("XHS服务清理完成")
 	}
 }
 
+// CloseBrowser 关闭指定账号的浏览器
+func (s *Service) CloseBrowser(accountID string) {
+	s.browserPool.CloseBrowser(accountID)
+}
+
+// GetActiveBrowserCount 获取活跃的浏览器数量
+func (s *Service) GetActiveBrowserCount() int {
+	return s.browserPool.GetActiveBrowserCount()
+}
+
+// GetActiveAccounts 获取所有活跃账号列表
+func (s *Service) GetActiveAccounts() []string {
+	return s.browserPool.GetActiveAccounts()
+}
+
 // PublishContent 发布内容
-func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
+func (s *Service) PublishContent(ctx context.Context, accountID string, req *PublishContent) (*PublishResponse, error) {
 	// 自动截取标题长度 - 小红书限制：最大40个字符(中文2字符，英文1字符)
 	// 使用 runewidth 计算显示宽度（中文2字符，英文1字符）
 	originalWidth := runewidth.StringWidth(req.Title)
@@ -169,7 +147,7 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 		logrus.Infof("截取完成: %d字符 -> %d字符", originalContentWidth, runewidth.StringWidth(req.Content))
 	}
 
-	logrus.Infof("处理图片: %v", req.URL)
+	logrus.Infof("处理图片 [账号: %s]: %v", accountID, req.URL)
 	// 处理图片：下载URL图片或使用本地路径
 	imagePaths, err := s.processImages(req.Images, req.URL)
 	if err != nil {
@@ -179,7 +157,7 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 	// 设置处理后的图片路径
 	req.ImagePaths = imagePaths
 
-	page := s.getBrowser().NewPage()
+	page := s.getBrowser(accountID).NewPage()
 	defer page.Close()
 
 	publisher, err := NewPublisher(page)

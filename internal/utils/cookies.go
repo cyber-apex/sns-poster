@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -12,13 +13,16 @@ import (
 
 // CookieManager Cookie管理器
 type CookieManager struct {
-	filePath string
+	accountID string
+	filePath  string
 }
 
 // NewCookieManager 创建Cookie管理器
-func NewCookieManager() *CookieManager {
+// accountID: 账号标识，为空则使用默认cookies.json
+func NewCookieManager(accountID string) *CookieManager {
 	return &CookieManager{
-		filePath: getCookiesFilePath(),
+		accountID: accountID,
+		filePath:  getCookiesFilePath(accountID),
 	}
 }
 
@@ -94,13 +98,19 @@ func (c *CookieManager) SetCookies(page *rod.Page) error {
 }
 
 // getCookiesFilePath 获取cookies文件路径
-func getCookiesFilePath() string {
-	// 检查旧路径是否存在（向后兼容）
-	tmpPath := filepath.Join(os.TempDir(), "cookies.json")
-	if _, err := os.Stat(tmpPath); err == nil {
-		return tmpPath
+func getCookiesFilePath(accountID string) string {
+	// 如果没有指定accountID，使用默认路径（向后兼容）
+	if accountID == "" {
+		// 检查旧路径是否存在（向后兼容）
+		tmpPath := filepath.Join(os.TempDir(), "cookies.json")
+		if _, err := os.Stat(tmpPath); err == nil {
+			return tmpPath
+		}
+		// 使用当前目录下的cookies.json
+		return "cookies.json"
 	}
 
-	// 使用当前目录下的cookies.json
-	return "cookies.json"
+	// 使用账号特定的cookie文件
+	cookiesDir := "cookies"
+	return filepath.Join(cookiesDir, fmt.Sprintf("cookies_%s.json", accountID))
 }
