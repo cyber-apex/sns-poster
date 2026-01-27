@@ -84,7 +84,10 @@ func NewBrowser(cfg *config.Config) *Browser {
 	// 硬编码使用管理器模式
 	l := launcher.MustNewManaged("")
 	// Launch with headful mode
-	l.Headless(false).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
+	// l.Headless(false).XVFB("--server-num=5", "--server-args=-screen 0 1600x900x16")
+
+	// 无头模式
+	// l.Headless(true)
 
 	logrus.Info("连接到远程浏览器...")
 

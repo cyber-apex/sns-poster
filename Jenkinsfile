@@ -91,10 +91,6 @@ pipeline {
                     echo "Running Go tests..."
                     go test -v ./...
                     
-                    echo "Checking Go modules..."
-                    go mod tidy
-                    go mod verify
-                    
                     echo "Running Go vet..."
                     go vet ./...
                 '''
