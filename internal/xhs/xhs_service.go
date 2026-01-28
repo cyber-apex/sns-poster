@@ -3,6 +3,8 @@ package xhs
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strings"
 	"sync"
 
 	"sns-poster/internal/config"
@@ -146,6 +148,18 @@ func (s *Service) Close() {
 	}
 }
 
+// filterSensitiveWordsByRegex 使用正则表达式过滤内容中的敏感词
+func (s *Service) filterSensitiveWordsByRegex(content string) string {
+	// 过滤内容中的敏感词
+	regexPatterns := []string{
+		// 正则表达式过滤超链接
+		"https?://[^\\s]+",
+	}
+
+	re := regexp.MustCompile(strings.Join(regexPatterns, "|"))
+	return re.ReplaceAllString(content, "***")
+}
+
 // PublishContent 发布内容
 func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*PublishResponse, error) {
 	// 自动截取标题长度 - 小红书限制：最大40个字符(中文2字符，英文1字符)
@@ -170,6 +184,9 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 
 		logrus.Infof("截取完成: %d字符 -> %d字符", originalContentWidth, runewidth.StringWidth(req.Content))
 	}
+
+	// 过滤内容中的敏感词
+	req.Content = s.filterSensitiveWordsByRegex(req.Content)
 
 	logrus.Infof("处理图片: %v", req.URL)
 	// 处理图片：下载URL图片或使用本地路径
