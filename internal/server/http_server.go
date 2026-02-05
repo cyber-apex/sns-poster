@@ -127,6 +127,7 @@ func (s *HTTPServer) setupRoutes() *gin.Engine {
 			protected.Use(s.xhsAuthMiddleware())
 			{
 				protected.POST("/publish", s.xhsPublishHandler)
+				protected.POST("/logout", s.xhsLogoutHandler)
 			}
 		}
 	}
@@ -320,6 +321,24 @@ func (s *HTTPServer) xhsLoginHandler(c *gin.Context) {
 	}
 
 	s.respondSuccess(c, result, "XHS登录成功")
+}
+
+// xhsLogoutHandler XHS登出处理
+func (s *HTTPServer) xhsLogoutHandler(c *gin.Context) {
+	result, err := s.xhsService.Logout(c.Request.Context())
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, "XHS_LOGOUT_FAILED",
+			"XHS登出失败", err.Error())
+		return
+	}
+
+	if !result.Success {
+		s.respondError(c, http.StatusBadRequest, "XHS_LOGOUT_FAILED",
+			result.Message, nil)
+		return
+	}
+
+	s.respondSuccess(c, nil, "XHS登出成功")
 }
 
 // xhsPublishHandler XHS发布内容

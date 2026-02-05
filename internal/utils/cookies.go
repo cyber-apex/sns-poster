@@ -61,6 +61,14 @@ func (c *CookieManager) SaveCookies(page *rod.Page) error {
 	return os.WriteFile(c.filePath, data, 0644)
 }
 
+// ClearCookies 清理Cookies
+func (c *CookieManager) ClearCookies() error {
+	if _, err := os.Stat(c.filePath); err == nil {
+		return os.Remove(c.filePath)
+	}
+	return nil
+}
+
 // SetCookies 设置Cookies到浏览器
 func (c *CookieManager) SetCookies(page *rod.Page) error {
 	cookies, err := c.LoadCookies()
