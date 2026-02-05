@@ -62,11 +62,10 @@ func (c *CookieManager) SaveCookies(page *rod.Page) error {
 }
 
 // ClearCookies 清理Cookies
-func (c *CookieManager) ClearCookies() error {
-	if _, err := os.Stat(c.filePath); err == nil {
-		if err := os.Remove(c.filePath); err != nil {
-			return errors.Wrap(err, "failed to clear cookies")
-		}
+func (c *CookieManager) ClearCookies(page *rod.Page) error {
+	err := page.Browser().SetCookies(nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to clear cookies")
 	}
 	return nil
 }

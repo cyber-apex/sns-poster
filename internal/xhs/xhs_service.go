@@ -142,9 +142,10 @@ func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 
 // Logout 登出小红书
 func (s *Service) Logout(ctx context.Context) (*LoginResponse, error) {
-	// 清理cookie
-	cookieManager := utils.NewCookieManager()
-	if err := cookieManager.ClearCookies(); err != nil {
+	browser := s.getBrowser()
+	// remove cookies from browser
+	err := browser.SetCookies(nil)
+	if err != nil {
 		return &LoginResponse{
 			Success: false,
 			Message: fmt.Sprintf("登出失败: %v", err),

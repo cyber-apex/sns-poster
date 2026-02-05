@@ -345,5 +345,7 @@ func (p *Publisher) waitPublishComplete(page *rod.Page) error {
 			return fmt.Errorf("发布失败: %s", serverToastText)
 		}
 	}
+
+	logrus.Info("发布完成")
 	return nil
 }
