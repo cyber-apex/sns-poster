@@ -207,6 +207,8 @@ func (p *Publisher) waitForUploadComplete(page *rod.Page, expectedCount int) err
 		time.Sleep(checkInterval)
 	}
 
+	debugScreenshot(page, fmt.Sprintf("upload_timeout_%s.png", time.Now().Format("2000-01-02_15-04-05")))
+
 	return errors.New("上传超时，请检查网络连接和图片大小")
 }
 
