@@ -327,14 +327,6 @@ func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error 
 	return nil
 }
 
-// min 辅助函数
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-
 // waitForLoginSuccess 等待登录成功
 func (l *Login) waitForLoginSuccess(page *rod.Page, ctx context.Context) error {
 	logrus.Info("等待用户扫码登录...")
