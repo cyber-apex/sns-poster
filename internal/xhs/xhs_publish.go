@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/input"
-	"github.com/go-rod/rod/lib/proto"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
@@ -142,7 +141,7 @@ func (p *Publisher) Publish(ctx context.Context, content PublishContent) error {
 }
 
 func (p *Publisher) uploadImages(page *rod.Page, imagesPaths []string) error {
-	logrus.Info("开始上传图片", "count", len(imagesPaths))
+	logrus.Info("[上传图片] 开始上传图片", "count", len(imagesPaths))
 
 	// 验证文件
 	for i, path := range imagesPaths {
@@ -175,7 +174,7 @@ func (p *Publisher) uploadImages(page *rod.Page, imagesPaths []string) error {
 		return fmt.Errorf("上传文件失败: %w", err)
 	}
 
-	logrus.Info("文件已上传，等待处理...")
+	logrus.Info("[上传图片] 文件已上传，等待处理...")
 	time.Sleep(3 * time.Second)
 
 	// 简单验证上传完成
@@ -194,14 +193,14 @@ func (p *Publisher) waitForUploadComplete(page *rod.Page, expectedCount int) err
 
 		if err == nil {
 			currentCount := len(uploadedImages)
-			logrus.Info("检测到已上传图片", "current_count", currentCount, "expected_count", expectedCount)
+			logrus.Info("[上传图片] 检测到已上传图片", "current_count", currentCount, "expected_count", expectedCount)
 			if currentCount >= expectedCount {
-				logrus.Info("所有图片上传完成", "count", currentCount)
+				logrus.Info("[上传图片] 所有图片上传完成", "count", currentCount)
 				return nil
 			}
 		} else {
 			debugScreenshot(page, "upload_indicators_not_found.png")
-			logrus.Debug("未找到已上传图片元素")
+			logrus.Debug("[上传图片] 未找到已上传图片元素")
 		}
 
 		time.Sleep(checkInterval)
@@ -213,14 +212,16 @@ func (p *Publisher) waitForUploadComplete(page *rod.Page, expectedCount int) err
 }
 
 func (p *Publisher) submitPublish(page *rod.Page, title, content string, tags []string) error {
+	logrus.Info("[提交发布] 开始提交发布")
+
 	titleElem, err := page.Element("div.d-input input.d-text")
 	if err != nil {
 		debugScreenshot(page, "title_input_not_found.png")
-		return fmt.Errorf("查找标题输入框失败: %w", err)
+		return fmt.Errorf("[提交发布] 查找标题输入框失败: %w", err)
 	}
 	err = titleElem.Input(title)
 	if err != nil {
-		return fmt.Errorf("输入标题失败: %w", err)
+		return fmt.Errorf("[提交发布] 输入标题失败: %w", err)
 	}
 
 	time.Sleep(1 * time.Second)
@@ -228,35 +229,27 @@ func (p *Publisher) submitPublish(page *rod.Page, title, content string, tags []
 	contentElem, err := page.Element("div.edit-container div[contenteditable='true']")
 	if err != nil {
 		debugScreenshot(page, "content_input_not_found.png")
-		return fmt.Errorf("查找内容输入框失败: %w", err)
+		return fmt.Errorf("[提交发布] 查找内容输入框失败: %w", err)
 	}
 
 	err = contentElem.Input(content)
 	if err != nil {
-		return fmt.Errorf("输入内容失败: %w", err)
+		return fmt.Errorf("[提交发布] 输入内容失败: %w", err)
 	}
 
 	p.inputTags(contentElem, tags)
 
 	time.Sleep(1 * time.Second)
 
-	submitButton, err := page.Element("div.submit button.d-button")
+	submitButton := page.MustElement("div.publish-page-publish-btn button.d-button:last-child")
 
-	if err != nil {
-		debugScreenshot(page, "submit_button_not_found.png")
-		return fmt.Errorf("查找提交按钮失败: %w", err)
-	}
-	err = submitButton.Click(proto.InputMouseButtonLeft, 1)
-	if err != nil {
-		debugScreenshot(page, "submit_button_click_failed.png")
-		return fmt.Errorf("点击提交按钮失败: %w", err)
-	}
+	submitButton.MustClick()
 
 	return p.waitPublishComplete(page)
 }
 
 func (p *Publisher) inputTags(contentElem *rod.Element, tags []string) {
-	logrus.Info("开始输入标签", "tags", tags)
+	logrus.Info("[提交发布] 开始输入标签", "tags", tags)
 	if len(tags) == 0 {
 		return
 	}
