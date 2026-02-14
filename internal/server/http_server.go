@@ -174,7 +174,13 @@ func getAccountID(c *gin.Context) string {
 	if v := c.GetHeader("X-Account-ID"); v != "" {
 		return v
 	}
-	return c.Query("account_id")
+	if v := c.Query("account_id"); v != "" {
+		return v
+	}
+
+	// FIXME: remove this after testing
+	// hardcode accountID for testing
+	return "65b09837000000000e025e61"
 }
 
 // ErrorResponse 错误响应
