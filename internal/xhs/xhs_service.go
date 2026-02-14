@@ -104,14 +104,14 @@ func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*Logi
 
 	loginAction := NewLogin(page)
 
-	isLoggedIn, err := loginAction.CheckLoginStatus(ctx)
+	accountIdText, err := loginAction.CheckLoginStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &LoginStatusResponse{
-		IsLoggedIn: isLoggedIn,
-		Username:   s.config.Username,
+		IsLoggedIn: true,
+		Username:   accountIdText,
 	}
 
 	return response, nil

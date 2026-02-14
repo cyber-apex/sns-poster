@@ -34,7 +34,7 @@ func NewLogin(page *rod.Page) *Login {
 }
 
 // CheckLoginStatus 检查登录状态
-func (l *Login) CheckLoginStatus(ctx context.Context) (bool, error) {
+func (l *Login) CheckLoginStatus(ctx context.Context) (string, error) {
 	pp := l.page.Context(ctx)
 
 	// Cookie已经在Browser.NewPage()中自动加载
@@ -45,14 +45,20 @@ func (l *Login) CheckLoginStatus(ctx context.Context) (bool, error) {
 
 	exists, _, err := pp.Has(`.main-container .user .link-wrapper .channel`)
 	if err != nil {
-		return false, errors.Wrap(err, "check login status failed")
+		return "", errors.Wrap(err, "failed to check login status")
 	}
 
 	if !exists {
-		return false, nil
+		return "", errors.New("not logged in")
 	}
 
-	return true, nil
+	accountIdText, err := l.getUserInfo(pp)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get user info, not logged in")
+	}
+	logrus.Infof("小红书账号: %+v，已经登录", accountIdText)
+
+	return accountIdText, nil
 }
 
 // Login 登录到小红书，accountID 用于保存 cookie 到该账号，为空为默认账号
