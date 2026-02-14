@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"regexp"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
@@ -123,32 +122,23 @@ func (c *CookieManager) SetCookies(page *rod.Page) error {
 	return page.Browser().SetCookies(cookieParams)
 }
 
-// getCookiesFilePath 获取cookies文件路径，accountID 为空时使用默认单账号路径
+// getCookiesFilePath 获取cookies文件路径
+// - accountID 为空或未指定时：使用 ./cookies.json（单账号默认路径）
+// - accountID 非空时：使用 ./cookies/<accountID>.json（多账号隔离）
 func getCookiesFilePath(accountID string) string {
 	baseDir := "."
-	// 检查旧路径是否存在（向后兼容，仅默认账号）
+	
+	// accountID 为空：使用默认单账号路径 cookies.json
 	if accountID == "" {
+		// 向后兼容：优先使用旧的 /tmp/cookies.json（如果存在）
 		tmpPath := filepath.Join(os.TempDir(), "cookies.json")
 		if _, err := os.Stat(tmpPath); err == nil {
 			return tmpPath
 		}
+		// 默认使用当前目录的 cookies.json
 		return filepath.Join(baseDir, "cookies.json")
 	}
-	// 多账号：cookies/<accountID>.json，账号ID会做文件名安全化
-	safe := sanitizeAccountID(accountID)
-	return filepath.Join(baseDir, "cookies", safe+".json")
-}
-
-// sanitizeAccountID 将账号ID转为安全的文件名（只保留字母数字、下划线、横线）
-var safeAccountIDRe = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
-
-func sanitizeAccountID(accountID string) string {
-	if accountID == "" {
-		return "default"
-	}
-	s := safeAccountIDRe.ReplaceAllString(accountID, "_")
-	if s == "" {
-		return "default"
-	}
-	return s
+	
+	// accountID 非空：使用 cookies/<accountID>.json 实现多账号隔离
+	return filepath.Join(baseDir, "cookies", accountID+".json")
 }
