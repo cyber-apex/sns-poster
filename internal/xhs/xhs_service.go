@@ -97,9 +97,9 @@ type PublishResponse struct {
 	Status  string `json:"status"`
 }
 
-// CheckLoginStatus 检查登录状态
-func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, error) {
-	page := s.getBrowser().NewPage()
+// CheckLoginStatus 检查登录状态，accountID 为空时使用默认单账号
+func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*LoginStatusResponse, error) {
+	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
 
 	loginAction := NewLogin(page)
@@ -117,14 +117,14 @@ func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, e
 	return response, nil
 }
 
-// Login 登录到小红书
-func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
-	page := s.getBrowser().NewPage()
+// Login 登录到小红书，accountID 为空时使用默认单账号
+func (s *Service) Login(ctx context.Context, accountID string) (*LoginResponse, error) {
+	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
 
 	loginAction := NewLogin(page)
 
-	err := loginAction.Login(ctx)
+	err := loginAction.Login(ctx, accountID)
 	if err != nil {
 		return &LoginResponse{
 			Success: false,
@@ -140,18 +140,15 @@ func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 	return response, nil
 }
 
-// Logout 登出小红书
-func (s *Service) Logout(ctx context.Context) (*LoginResponse, error) {
-	browser := s.getBrowser()
-	// remove cookies from browser
-	err := browser.SetCookies(nil)
-	if err != nil {
+// Logout 登出小红书：删除该账号的 cookie 文件，accountID 为空时使用默认单账号
+func (s *Service) Logout(ctx context.Context, accountID string) (*LoginResponse, error) {
+	cm := utils.NewCookieManagerForAccount(accountID)
+	if err := cm.ClearCookieFile(); err != nil {
 		return &LoginResponse{
 			Success: false,
 			Message: fmt.Sprintf("登出失败: %v", err),
 		}, nil
 	}
-
 	return &LoginResponse{Success: true, Message: "登出成功"}, nil
 }
 
@@ -213,10 +210,11 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 	// 设置处理后的图片路径
 	req.ImagePaths = imagePaths
 
-	page := s.getBrowser().NewPage()
+	accountID := req.AccountID
+	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
 
-	publisher, err := NewPublisher(page)
+	publisher, err := NewPublisher(page, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("创建发布器失败: %w", err)
 	}

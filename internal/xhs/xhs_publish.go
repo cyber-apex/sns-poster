@@ -15,6 +15,7 @@ import (
 
 // PublishContent 发布内容结构
 type PublishContent struct {
+	AccountID  string   `json:"account_id,omitempty"`  // 多账号时指定账号，为空为默认账号
 	Title      string   `json:"title" binding:"required"`
 	Content    string   `json:"content" binding:"required"`
 	Images     []string `json:"images" binding:"required,min=1"`
@@ -25,7 +26,8 @@ type PublishContent struct {
 
 // Publisher 小红书发布器
 type Publisher struct {
-	page *rod.Page
+	page      *rod.Page
+	accountID string
 }
 
 const (
@@ -52,8 +54,8 @@ func debugScreenshot(page *rod.Page, filename string) error {
 	return nil
 }
 
-// NewPublisher 创建发布器实例
-func NewPublisher(page *rod.Page) (*Publisher, error) {
+// NewPublisher 创建发布器实例，accountID 用于发布过程中如需登录时保存 cookie
+func NewPublisher(page *rod.Page, accountID string) (*Publisher, error) {
 	// 使用独立的context，设置足够长的超时时间
 	pp := page.Timeout(300 * time.Second) // 5分钟超时，足够完成发布流程
 
@@ -73,9 +75,9 @@ func NewPublisher(page *rod.Page) (*Publisher, error) {
 	if strings.Contains(currentURL, "login") {
 		logrus.Info("检测到登录页面，开始登录流程", "url", currentURL)
 
-		// 在当前浏览器实例中执行登录
+		// 在当前浏览器实例中执行登录（使用当前请求的 accountID 保存 cookie）
 		loginHandler := &Login{page: pp}
-		loginErr := loginHandler.Login(context.Background())
+		loginErr := loginHandler.Login(context.Background(), accountID)
 		if loginErr != nil {
 			return nil, fmt.Errorf("发布时登录失败: %w", loginErr)
 		}
@@ -109,7 +111,8 @@ func NewPublisher(page *rod.Page) (*Publisher, error) {
 	logrus.Info("上传区域已可见，发布页面加载成功")
 
 	return &Publisher{
-		page: pp,
+		page:      pp,
+		accountID: accountID,
 	}, nil
 }
 

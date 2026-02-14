@@ -20,6 +20,14 @@ type Login struct {
 	page *rod.Page
 }
 
+type UserInfo struct {
+	Code int `json:"code"`
+	Data struct {
+		UserName string `json:"userName"`
+		UserId   string `json:"userId"`
+	} `json:"data"`
+}
+
 // NewLogin 创建登录处理实例
 func NewLogin(page *rod.Page) *Login {
 	return &Login{page: page}
@@ -47,8 +55,8 @@ func (l *Login) CheckLoginStatus(ctx context.Context) (bool, error) {
 	return true, nil
 }
 
-// Login 登录到小红书
-func (l *Login) Login(ctx context.Context) error {
+// Login 登录到小红书，accountID 用于保存 cookie 到该账号，为空为默认账号
+func (l *Login) Login(ctx context.Context, accountID string) error {
 	pp := l.page.Context(ctx)
 
 	// Cookie已经在Browser.NewPage()中自动加载
@@ -61,8 +69,15 @@ func (l *Login) Login(ctx context.Context) error {
 
 	// 检查是否已经登录
 	if exists, _, _ := pp.Has(".main-container .user .link-wrapper .channel"); exists {
-		// 已经登录，保存cookies
-		cookieManager := utils.NewCookieManager()
+		logrus.Info("已经登录,查验小红书账号...")
+		accountIdText, err := l.getUserInfo(pp)
+		if err != nil {
+			return err
+		}
+		logrus.Infof("小红书账号: %+v，不需要重新登录", accountIdText)
+
+		// 已经登录，保存cookies（按请求指定的账号）
+		cookieManager := utils.NewCookieManagerForAccount(accountID)
 		if err := cookieManager.SaveCookies(pp); err != nil {
 			logrus.Warnf("保存cookies失败: %v", err)
 		}
@@ -87,14 +102,32 @@ func (l *Login) Login(ctx context.Context) error {
 		return err
 	}
 
-	// 保存cookies
-	cookieManager := utils.NewCookieManager()
+	// 通过接口获取用户信息
+	accountIdText, err := l.getUserInfo(pp)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("登录成功，小红书账号: %+v", accountIdText)
+
+	// 保存cookies（按请求指定的账号）
+	cookieManager := utils.NewCookieManagerForAccount(accountID)
 	if err := cookieManager.SaveCookies(pp); err != nil {
 		logrus.Warnf("保存cookies失败: %v", err)
 	}
 
 	logrus.Info("登录成功！")
 	return nil
+}
+
+// getUserInfo 通过接口获取用户信息
+func (l *Login) getUserInfo(page *rod.Page) (string, error) {
+	href, err := page.MustElement(".main-container .user a.link-wrapper").Attribute("href")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get user info")
+	}
+	// href="/user/profile/6189d656000000001000d4a6"
+	return strings.TrimPrefix(*href, "/user/profile/"), nil
 }
 
 // triggerLoginQRCode 触发二维码显示
