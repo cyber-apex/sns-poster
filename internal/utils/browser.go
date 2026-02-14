@@ -12,11 +12,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Browser 浏览器实例
+// Browser 浏览器实例（多账号时按 accountID 在 NewPage 中加载对应 cookie）
 type Browser struct {
 	*rod.Browser
-	launcher      *launcher.Launcher
-	cookieManager *CookieManager
+	launcher *launcher.Launcher
 }
 
 // restartRodContainer 重启 Rod Docker 容器并等待其就绪
@@ -39,8 +38,8 @@ func restartRodContainer() error {
 	return nil
 }
 
-// NewPage 创建新页面并自动加载cookies
-func (b *Browser) NewPage() *rod.Page {
+// NewPage 创建新页面并加载指定账号的 cookies。accountID 为空时使用默认单账号。
+func (b *Browser) NewPage(accountID string) *rod.Page {
 	// 检查浏览器连接是否有效
 	defer func() {
 		if r := recover(); r != nil {
@@ -57,10 +56,9 @@ func (b *Browser) NewPage() *rod.Page {
 
 	page := b.Browser.MustPage()
 
-	// 自动加载cookies
-	if b.cookieManager != nil {
-		b.cookieManager.SetCookies(page)
-	}
+	// 按账号加载 cookies
+	cm := NewCookieManagerForAccount(accountID)
+	_ = cm.SetCookies(page)
 
 	return page
 }
@@ -115,18 +113,14 @@ func NewBrowser(cfg *config.Config) *Browser {
 		resultChan <- result{browser, nil}
 	}()
 
-	// 创建cookie管理器（只创建一次，所有分支共享）
-	cookieManager := NewCookieManager()
-
 	// 等待连接结果或超时
 	select {
 	case res := <-resultChan:
 		if res.browser != nil {
 			logrus.Info("浏览器连接成功")
 			return &Browser{
-				Browser:       res.browser,
-				launcher:      l,
-				cookieManager: cookieManager,
+				Browser:  res.browser,
+				launcher: l,
 			}
 		}
 
@@ -145,9 +139,8 @@ func NewBrowser(cfg *config.Config) *Browser {
 
 		logrus.Info("重启后浏览器连接成功")
 		return &Browser{
-			Browser:       browser,
-			launcher:      l,
-			cookieManager: cookieManager,
+			Browser:  browser,
+			launcher: l,
 		}
 
 	case <-connectCtx.Done():
@@ -166,9 +159,8 @@ func NewBrowser(cfg *config.Config) *Browser {
 
 		logrus.Info("重启后浏览器连接成功")
 		return &Browser{
-			Browser:       browser,
-			launcher:      l,
-			cookieManager: cookieManager,
+			Browser:  browser,
+			launcher: l,
 		}
 	}
 }

@@ -34,7 +34,7 @@ func main() {
 		log.Fatalf("初始化日志系统失败: %v", err)
 	}
 
-	// 初始化配置
+	// 初始化配置（accountID 由各 HTTP 请求 / 消息携带，不在此指定）
 	cfg := &config.Config{}
 
 	// 延迟初始化小红书服务，避免rod在flag.Parse()之前注册标志

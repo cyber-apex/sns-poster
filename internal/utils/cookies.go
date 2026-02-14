@@ -4,22 +4,35 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/proto"
 	"github.com/pkg/errors"
 )
 
-// CookieManager Cookie管理器
+// CookieManager Cookie管理器，支持按账号隔离
 type CookieManager struct {
-	filePath string
+	filePath  string
+	accountID string
 }
 
-// NewCookieManager 创建Cookie管理器
+// NewCookieManager 创建Cookie管理器（默认账号，向后兼容）
 func NewCookieManager() *CookieManager {
+	return NewCookieManagerForAccount("")
+}
+
+// NewCookieManagerForAccount 创建指定账号的Cookie管理器，多账号时每个账号独立文件
+func NewCookieManagerForAccount(accountID string) *CookieManager {
 	return &CookieManager{
-		filePath: getCookiesFilePath(),
+		filePath:  getCookiesFilePath(accountID),
+		accountID: accountID,
 	}
+}
+
+// AccountID 返回当前管理器对应的账号ID，空表示默认账号
+func (c *CookieManager) AccountID() string {
+	return c.accountID
 }
 
 // LoadCookies 加载Cookies
@@ -61,11 +74,19 @@ func (c *CookieManager) SaveCookies(page *rod.Page) error {
 	return os.WriteFile(c.filePath, data, 0644)
 }
 
-// ClearCookies 清理Cookies
+// ClearCookies 清理浏览器中的 Cookies（当前页面所在浏览器）
 func (c *CookieManager) ClearCookies(page *rod.Page) error {
 	err := page.Browser().SetCookies(nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to clear cookies")
+	}
+	return nil
+}
+
+// ClearCookieFile 删除该账号的 cookie 存储文件，登出后下次将无 cookie 可用
+func (c *CookieManager) ClearCookieFile() error {
+	if err := os.Remove(c.filePath); err != nil && !os.IsNotExist(err) {
+		return errors.Wrap(err, "failed to remove cookies file")
 	}
 	return nil
 }
@@ -102,14 +123,32 @@ func (c *CookieManager) SetCookies(page *rod.Page) error {
 	return page.Browser().SetCookies(cookieParams)
 }
 
-// getCookiesFilePath 获取cookies文件路径
-func getCookiesFilePath() string {
-	// 检查旧路径是否存在（向后兼容）
-	tmpPath := filepath.Join(os.TempDir(), "cookies.json")
-	if _, err := os.Stat(tmpPath); err == nil {
-		return tmpPath
+// getCookiesFilePath 获取cookies文件路径，accountID 为空时使用默认单账号路径
+func getCookiesFilePath(accountID string) string {
+	baseDir := "."
+	// 检查旧路径是否存在（向后兼容，仅默认账号）
+	if accountID == "" {
+		tmpPath := filepath.Join(os.TempDir(), "cookies.json")
+		if _, err := os.Stat(tmpPath); err == nil {
+			return tmpPath
+		}
+		return filepath.Join(baseDir, "cookies.json")
 	}
+	// 多账号：cookies/<accountID>.json，账号ID会做文件名安全化
+	safe := sanitizeAccountID(accountID)
+	return filepath.Join(baseDir, "cookies", safe+".json")
+}
 
-	// 使用当前目录下的cookies.json
-	return "cookies.json"
+// sanitizeAccountID 将账号ID转为安全的文件名（只保留字母数字、下划线、横线）
+var safeAccountIDRe = regexp.MustCompile(`[^a-zA-Z0-9_-]+`)
+
+func sanitizeAccountID(accountID string) string {
+	if accountID == "" {
+		return "default"
+	}
+	s := safeAccountIDRe.ReplaceAllString(accountID, "_")
+	if s == "" {
+		return "default"
+	}
+	return s
 }

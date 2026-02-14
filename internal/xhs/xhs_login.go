@@ -20,15 +20,22 @@ type Login struct {
 	page *rod.Page
 }
 
+type UserInfo struct {
+	Code int `json:"code"`
+	Data struct {
+		UserName string `json:"userName"`
+		UserId   string `json:"userId"`
+	} `json:"data"`
+}
+
 // NewLogin 创建登录处理实例
 func NewLogin(page *rod.Page) *Login {
 	return &Login{page: page}
 }
 
 // CheckLoginStatus 检查登录状态
-func (l *Login) CheckLoginStatus(ctx context.Context) (bool, error) {
+func (l *Login) CheckLoginStatus(ctx context.Context) (string, error) {
 	pp := l.page.Context(ctx)
-
 	// Cookie已经在Browser.NewPage()中自动加载
 
 	pp.MustNavigate("https://www.xiaohongshu.com/explore").MustWaitLoad()
@@ -37,20 +44,30 @@ func (l *Login) CheckLoginStatus(ctx context.Context) (bool, error) {
 
 	exists, _, err := pp.Has(`.main-container .user .link-wrapper .channel`)
 	if err != nil {
-		return false, errors.Wrap(err, "check login status failed")
+		return "", errors.Wrap(err, "failed to check login status")
 	}
 
 	if !exists {
-		return false, nil
+		return "", errors.New("not logged in")
 	}
 
-	return true, nil
+	accountIdText, err := l.getUserInfo(pp)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get user info, not logged in")
+	}
+	logrus.Infof("小红书账号: %+v，已经登录", accountIdText)
+
+	return accountIdText, nil
 }
 
-// Login 登录到小红书
+// Login 登录到小红书，accountID 用于保存 cookie 到该账号，为空为默认账号
 func (l *Login) Login(ctx context.Context) error {
+	accountID, ok := ctx.Value("accountID").(string)
+	if !ok {
+		return errors.New("accountID not found in context, please set accountID in context")
+	}
+	logrus.Infof("accountID: %s", accountID)
 	pp := l.page.Context(ctx)
-
 	// Cookie已经在Browser.NewPage()中自动加载
 
 	// 导航到小红书首页，这会触发二维码弹窗
@@ -61,8 +78,21 @@ func (l *Login) Login(ctx context.Context) error {
 
 	// 检查是否已经登录
 	if exists, _, _ := pp.Has(".main-container .user .link-wrapper .channel"); exists {
-		// 已经登录，保存cookies
-		cookieManager := utils.NewCookieManager()
+		logrus.Info("已经登录,查验小红书账号...")
+		accountIdText, err := l.getUserInfo(pp)
+		if err != nil {
+			return err
+		}
+
+		if accountID != accountIdText {
+			logrus.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
+			return errors.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
+		}
+
+		logrus.Infof("小红书账号: %+v，不需要重新登录", accountIdText)
+
+		// 已经登录，保存cookies（按请求指定的账号）
+		cookieManager := utils.NewCookieManagerForAccount(accountID)
 		if err := cookieManager.SaveCookies(pp); err != nil {
 			logrus.Warnf("保存cookies失败: %v", err)
 		}
@@ -87,14 +117,37 @@ func (l *Login) Login(ctx context.Context) error {
 		return err
 	}
 
-	// 保存cookies
-	cookieManager := utils.NewCookieManager()
+	// 通过接口获取用户信息
+	accountIdText, err := l.getUserInfo(pp)
+	if err != nil {
+		return err
+	}
+
+	logrus.Infof("登录成功，小红书账号: %+v", accountIdText)
+
+	if accountID != accountIdText {
+		logrus.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
+		return errors.New("登录账号与请求账号不匹配")
+	}
+
+	// 保存cookies（按请求指定的账号）
+	cookieManager := utils.NewCookieManagerForAccount(accountID)
 	if err := cookieManager.SaveCookies(pp); err != nil {
 		logrus.Warnf("保存cookies失败: %v", err)
 	}
 
 	logrus.Info("登录成功！")
 	return nil
+}
+
+// getUserInfo 通过接口获取用户信息
+func (l *Login) getUserInfo(page *rod.Page) (string, error) {
+	href, err := page.MustElement(".main-container .user a.link-wrapper").Attribute("href")
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get user info")
+	}
+	// href="/user/profile/6189d656000000001000d4a6"
+	return strings.TrimPrefix(*href, "/user/profile/"), nil
 }
 
 // triggerLoginQRCode 触发二维码显示
@@ -303,7 +356,7 @@ func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error 
 		logrus.Infof("二维码截图转换为data URL，大小: %d bytes", len(base64Data))
 
 		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(dataURL); err != nil {
+		if err := qrDisplay.DisplayQRCode(dataURL, ctx.Value("accountID").(string)); err != nil {
 			logrus.Warnf("显示二维码失败: %v", err)
 			// 回退到基本说明
 			// 回退到基本说明，输出简单的图片URL提示
@@ -312,7 +365,7 @@ func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error 
 	} else {
 		logrus.Infof("获取到二维码src: %s", (*src)[:min(100, len(*src))])
 		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(*src); err != nil {
+		if err := qrDisplay.DisplayQRCode(*src, ctx.Value("accountID").(string)); err != nil {
 			logrus.Warnf("显示二维码失败: %v", err)
 		}
 

@@ -158,7 +158,7 @@ func (s *HTTPServer) corsMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, X-Account-ID")
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
@@ -167,6 +167,14 @@ func (s *HTTPServer) corsMiddleware() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// getAccountID 从请求中读取 accountID：优先 Header X-Account-ID，其次 Query account_id
+func getAccountID(c *gin.Context) string {
+	if v := c.GetHeader("X-Account-ID"); v != "" {
+		return v
+	}
+	return c.Query("account_id")
 }
 
 // ErrorResponse 错误响应
@@ -243,11 +251,11 @@ func (s *HTTPServer) respondSuccess(c *gin.Context, data any, message string) {
 	c.JSON(http.StatusOK, response)
 }
 
-// xhsAuthMiddleware XHS认证中间件 - 自动触发登录
+// xhsAuthMiddleware XHS认证中间件 - 按请求中的 accountID 检查登录状态
 func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 检查XHS登录状态
-		status, err := s.xhsService.CheckLoginStatus(c.Request.Context())
+		accountID := getAccountID(c)
+		status, err := s.xhsService.CheckLoginStatus(c.Request.Context(), accountID)
 		if err != nil {
 			s.respondError(c, http.StatusInternalServerError, "XHS_AUTH_CHECK_FAILED",
 				"无法验证XHS登录状态", err.Error())
@@ -257,13 +265,11 @@ func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 
 		if !status.IsLoggedIn {
 			logrus.Info("XHS用户未登录，发布器将在需要时处理登录流程")
-			// 不在中间件中强制登录，让发布器根据实际情况处理
-			// 这样可以确保登录和发布在同一个浏览器会话中进行
 		}
 
-		// 将用户信息存储在上下文中
 		c.Set("xhs_username", status.Username)
 		c.Set("xhs_is_logged_in", status.IsLoggedIn)
+		c.Set("xhs_account_id", accountID)
 		c.Next()
 	}
 }
@@ -293,9 +299,10 @@ func (s *HTTPServer) errorResponseTestHandler(c *gin.Context) {
 		"错误测试", "错误测试详情")
 }
 
-// checkXHSLoginStatusHandler 检查XHS登录状态
+// checkXHSLoginStatusHandler 检查XHS登录状态，accountID 通过 Header X-Account-ID 或 Query account_id 传递
 func (s *HTTPServer) checkXHSLoginStatusHandler(c *gin.Context) {
-	status, err := s.xhsService.CheckLoginStatus(c.Request.Context())
+	accountID := getAccountID(c)
+	status, err := s.xhsService.CheckLoginStatus(c.Request.Context(), accountID)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_STATUS_CHECK_FAILED",
 			"检查XHS登录状态失败", err.Error())
@@ -305,9 +312,15 @@ func (s *HTTPServer) checkXHSLoginStatusHandler(c *gin.Context) {
 	s.respondSuccess(c, status, "检查XHS登录状态成功")
 }
 
-// xhsLoginHandler XHS登录处理
+// xhsLoginHandler XHS登录处理，accountID 通过 Header X-Account-ID 或 Query account_id 传递
 func (s *HTTPServer) xhsLoginHandler(c *gin.Context) {
-	result, err := s.xhsService.Login(c.Request.Context())
+	accountID := getAccountID(c)
+
+	// set accountID to context
+	ctx := context.WithValue(c.Request.Context(), "accountID", accountID)
+	logrus.Infof("accountID: %s", accountID)
+	logrus.Infof("ctx: %v", ctx)
+	result, err := s.xhsService.Login(ctx)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_LOGIN_FAILED",
 			"XHS登录失败", err.Error())
@@ -323,9 +336,10 @@ func (s *HTTPServer) xhsLoginHandler(c *gin.Context) {
 	s.respondSuccess(c, result, "XHS登录成功")
 }
 
-// xhsLogoutHandler XHS登出处理
+// xhsLogoutHandler XHS登出处理，accountID 通过 Header X-Account-ID 或 Query account_id 传递
 func (s *HTTPServer) xhsLogoutHandler(c *gin.Context) {
-	result, err := s.xhsService.Logout(c.Request.Context())
+	accountID := getAccountID(c)
+	result, err := s.xhsService.Logout(c.Request.Context(), accountID)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_LOGOUT_FAILED",
 			"XHS登出失败", err.Error())
@@ -341,7 +355,7 @@ func (s *HTTPServer) xhsLogoutHandler(c *gin.Context) {
 	s.respondSuccess(c, nil, "XHS登出成功")
 }
 
-// xhsPublishHandler XHS发布内容
+// xhsPublishHandler XHS发布内容，accountID 可从 body.account_id 或 Header X-Account-ID 或 Query account_id 传递
 func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 	var req xhs.PublishContent
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -349,12 +363,13 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 			"请求参数错误", err.Error())
 		return
 	}
+	if req.AccountID == "" {
+		req.AccountID = getAccountID(c)
+	}
 
-	// 从上下文获取XHS用户信息
 	username, _ := c.Get("xhs_username")
 	logrus.Infof("XHS用户 %v 请求发布内容: %s", username, req.Title)
 
-	// 执行XHS发布
 	result, err := s.xhsService.PublishContent(c.Request.Context(), &req)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_PUBLISH_FAILED",

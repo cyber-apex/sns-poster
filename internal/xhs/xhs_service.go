@@ -11,6 +11,7 @@ import (
 	"sns-poster/internal/utils"
 
 	"github.com/mattn/go-runewidth"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -97,35 +98,42 @@ type PublishResponse struct {
 	Status  string `json:"status"`
 }
 
-// CheckLoginStatus 检查登录状态
-func (s *Service) CheckLoginStatus(ctx context.Context) (*LoginStatusResponse, error) {
-	page := s.getBrowser().NewPage()
+// CheckLoginStatus 检查登录状态，accountID 为空时使用默认单账号
+func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*LoginStatusResponse, error) {
+	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
 
 	loginAction := NewLogin(page)
 
-	isLoggedIn, err := loginAction.CheckLoginStatus(ctx)
+	accountIdText, err := loginAction.CheckLoginStatus(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	response := &LoginStatusResponse{
-		IsLoggedIn: isLoggedIn,
-		Username:   s.config.Username,
+		IsLoggedIn: true,
+		Username:   accountIdText,
 	}
 
 	return response, nil
 }
 
-// Login 登录到小红书
+// Login 登录到小红书，accountID 为空时使用默认单账号
 func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
-	page := s.getBrowser().NewPage()
+	accountID, ok := ctx.Value("accountID").(string)
+	if !ok {
+		return nil, errors.New("accountID not found in context")
+	}
+	logrus.Infof("登录小红书账号: %s", accountID)
+
+	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
 
 	loginAction := NewLogin(page)
 
 	err := loginAction.Login(ctx)
 	if err != nil {
+		logrus.Errorf("登录小红书账号 %s 失败: %v", accountID, err)
 		return &LoginResponse{
 			Success: false,
 			Message: fmt.Sprintf("登录失败: %v", err),
@@ -140,18 +148,15 @@ func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 	return response, nil
 }
 
-// Logout 登出小红书
-func (s *Service) Logout(ctx context.Context) (*LoginResponse, error) {
-	browser := s.getBrowser()
-	// remove cookies from browser
-	err := browser.SetCookies(nil)
-	if err != nil {
+// Logout 登出小红书：删除该账号的 cookie 文件，accountID 为空时使用默认单账号
+func (s *Service) Logout(ctx context.Context, accountID string) (*LoginResponse, error) {
+	cm := utils.NewCookieManagerForAccount(accountID)
+	if err := cm.ClearCookieFile(); err != nil {
 		return &LoginResponse{
 			Success: false,
 			Message: fmt.Sprintf("登出失败: %v", err),
 		}, nil
 	}
-
 	return &LoginResponse{Success: true, Message: "登出成功"}, nil
 }
 
@@ -213,10 +218,11 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 	// 设置处理后的图片路径
 	req.ImagePaths = imagePaths
 
-	page := s.getBrowser().NewPage()
+	accountID := req.AccountID
+	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
 
-	publisher, err := NewPublisher(page)
+	publisher, err := NewPublisher(page, accountID)
 	if err != nil {
 		return nil, fmt.Errorf("创建发布器失败: %w", err)
 	}
