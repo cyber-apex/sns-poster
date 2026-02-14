@@ -83,6 +83,12 @@ func (l *Login) Login(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
+		if accountID != accountIdText {
+			logrus.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
+			return errors.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
+		}
+
 		logrus.Infof("小红书账号: %+v，不需要重新登录", accountIdText)
 
 		// 已经登录，保存cookies（按请求指定的账号）
@@ -118,6 +124,11 @@ func (l *Login) Login(ctx context.Context) error {
 	}
 
 	logrus.Infof("登录成功，小红书账号: %+v", accountIdText)
+
+	if accountID != accountIdText {
+		logrus.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
+		return errors.New("登录账号与请求账号不匹配")
+	}
 
 	// 保存cookies（按请求指定的账号）
 	cookieManager := utils.NewCookieManagerForAccount(accountID)
