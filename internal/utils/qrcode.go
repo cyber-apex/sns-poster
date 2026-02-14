@@ -63,7 +63,7 @@ func (q *QRCodeDisplay) DisplayQRCode(dataURL string, accountID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %v", err)
 	}
-	http.Post("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=aa06d601-eca3-4db4-a4ca-f73e08092774",
+	http.Post("http://localhost:6181/api/v1/alert-wecom",
 		"application/json", bytes.NewBuffer(jsonData))
 
 	// 在日志中显示二维码图像信息
@@ -201,7 +201,7 @@ func (q *QRCodeDisplay) sendQRCodeToWecom(imageData []byte, accountID string) er
 	if err != nil {
 		return fmt.Errorf("failed to marshal payload: %v", err)
 	}
-	resp, err := http.Post("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=aa06d601-eca3-4db4-a4ca-f73e08092774", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post("http://localhost:6181/api/v1/alert-wecom", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to send QR code to Wecom: %v", err)
 	}

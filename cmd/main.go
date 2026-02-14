@@ -103,7 +103,7 @@ func gracefulShutdown(httpServer *server.HTTPServer, xhsService *xhs.Service) {
 // logServerStartupInfo 显示服务器启动信息
 func logServerStartupInfo() {
 	logrus.Info("========================================")
-	logrus.Info("🚀 SNS Notify HTTP服务已启动")
+	logrus.Info("🚀 SNS Poster HTTP服务已启动")
 	logrus.Info("========================================")
 	logrus.Info("📡 HTTP API: http://localhost:6170")
 }
