@@ -36,7 +36,6 @@ func NewLogin(page *rod.Page) *Login {
 // CheckLoginStatus 检查登录状态
 func (l *Login) CheckLoginStatus(ctx context.Context) (string, error) {
 	pp := l.page.Context(ctx)
-
 	// Cookie已经在Browser.NewPage()中自动加载
 
 	pp.MustNavigate("https://www.xiaohongshu.com/explore").MustWaitLoad()
@@ -62,9 +61,13 @@ func (l *Login) CheckLoginStatus(ctx context.Context) (string, error) {
 }
 
 // Login 登录到小红书，accountID 用于保存 cookie 到该账号，为空为默认账号
-func (l *Login) Login(ctx context.Context, accountID string) error {
+func (l *Login) Login(ctx context.Context) error {
+	accountID, ok := ctx.Value("accountID").(string)
+	if !ok {
+		return errors.New("accountID not found in context, please set accountID in context")
+	}
+	logrus.Infof("accountID: %s", accountID)
 	pp := l.page.Context(ctx)
-
 	// Cookie已经在Browser.NewPage()中自动加载
 
 	// 导航到小红书首页，这会触发二维码弹窗
@@ -342,7 +345,7 @@ func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error 
 		logrus.Infof("二维码截图转换为data URL，大小: %d bytes", len(base64Data))
 
 		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(dataURL); err != nil {
+		if err := qrDisplay.DisplayQRCode(dataURL, ctx.Value("accountID").(string)); err != nil {
 			logrus.Warnf("显示二维码失败: %v", err)
 			// 回退到基本说明
 			// 回退到基本说明，输出简单的图片URL提示
@@ -351,7 +354,7 @@ func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error 
 	} else {
 		logrus.Infof("获取到二维码src: %s", (*src)[:min(100, len(*src))])
 		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(*src); err != nil {
+		if err := qrDisplay.DisplayQRCode(*src, ctx.Value("accountID").(string)); err != nil {
 			logrus.Warnf("显示二维码失败: %v", err)
 		}
 

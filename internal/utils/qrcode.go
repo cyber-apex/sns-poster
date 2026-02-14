@@ -2,9 +2,14 @@ package utils
 
 import (
 	"bytes"
+	"crypto/md5"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"image"
+	"io"
+	"net/http"
 	"os"
 	"strings"
 
@@ -26,7 +31,8 @@ func NewQRCodeDisplay() *QRCodeDisplay {
 }
 
 // DisplayQRCode 在终端显示二维码
-func (q *QRCodeDisplay) DisplayQRCode(dataURL string) error {
+func (q *QRCodeDisplay) DisplayQRCode(dataURL string, accountID string) error {
+	logrus.Infof("Display Login QRCode for accountID: %s", accountID)
 	// 提取base64数据
 	if !strings.HasPrefix(dataURL, "data:image/") {
 		return fmt.Errorf("invalid data URL format")
@@ -46,6 +52,20 @@ func (q *QRCodeDisplay) DisplayQRCode(dataURL string) error {
 
 	logrus.Infof("二维码数据大小: %d bytes", len(imageData))
 
+	textPayload := map[string]any{
+		"msgtype": "text",
+		"text": map[string]string{
+			"content": fmt.Sprintf("小红书登录二维码 for accountID: %s", accountID),
+		},
+	}
+
+	jsonData, err := json.Marshal(textPayload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %v", err)
+	}
+	http.Post("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=aa06d601-eca3-4db4-a4ca-f73e08092774",
+		"application/json", bytes.NewBuffer(jsonData))
+
 	// 在日志中显示二维码图像信息
 	q.printQRCodeImageInLog(dataURL)
 
@@ -53,6 +73,12 @@ func (q *QRCodeDisplay) DisplayQRCode(dataURL string) error {
 	err = q.printQRCodeASCII(imageData)
 	if err != nil {
 		logrus.Warnf("无法显示原始二维码ASCII版本: %v", err)
+	}
+
+	// 发送二维码到企业微信
+	err = q.sendQRCodeToWecom(imageData, accountID)
+	if err != nil {
+		logrus.Warnf("无法发送二维码到企业微信: %v", err)
 	}
 
 	// 同时显示一个备用的提示QR码
@@ -151,6 +177,43 @@ func (q *QRCodeDisplay) printQRCodeASCII(imageData []byte) error {
 	}
 
 	logrus.Info("========================================")
+	return nil
+}
+
+func (q *QRCodeDisplay) sendQRCodeToWecom(imageData []byte, accountID string) error {
+	// 注：图片（base64编码前）最大不能超过2M，支持JPG,PNG格式
+	logrus.Infof("发送二维码到企业微信")
+	// 分离base64数据
+	base64Data := base64.StdEncoding.EncodeToString(imageData)
+	// 获得文件的byte后进行md5计算
+	md5Data := md5.Sum(imageData)
+	md5String := hex.EncodeToString(md5Data[:])
+
+	payload := map[string]any{
+		"msgtype": "image",
+		"image": map[string]string{
+			"base64": base64Data,
+			"md5":    md5String,
+		},
+	}
+
+	jsonData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("failed to marshal payload: %v", err)
+	}
+	resp, err := http.Post("https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=aa06d601-eca3-4db4-a4ca-f73e08092774", "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return fmt.Errorf("failed to send QR code to Wecom: %v", err)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %v", err)
+	}
+	logrus.Infof("发送二维码到企业微信响应: %s", string(body))
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to send QR code to Wecom: %v", resp.StatusCode)
+	}
 	return nil
 }
 

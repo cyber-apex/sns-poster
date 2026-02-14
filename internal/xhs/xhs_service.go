@@ -11,6 +11,7 @@ import (
 	"sns-poster/internal/utils"
 
 	"github.com/mattn/go-runewidth"
+	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 )
 
@@ -118,14 +119,21 @@ func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*Logi
 }
 
 // Login 登录到小红书，accountID 为空时使用默认单账号
-func (s *Service) Login(ctx context.Context, accountID string) (*LoginResponse, error) {
+func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
+	accountID, ok := ctx.Value("accountID").(string)
+	if !ok {
+		return nil, errors.New("accountID not found in context")
+	}
+	logrus.Infof("登录小红书账号: %s", accountID)
+
 	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
 
 	loginAction := NewLogin(page)
 
-	err := loginAction.Login(ctx, accountID)
+	err := loginAction.Login(ctx)
 	if err != nil {
+		logrus.Errorf("登录小红书账号 %s 失败: %v", accountID, err)
 		return &LoginResponse{
 			Success: false,
 			Message: fmt.Sprintf("登录失败: %v", err),

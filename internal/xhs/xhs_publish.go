@@ -15,7 +15,7 @@ import (
 
 // PublishContent 发布内容结构
 type PublishContent struct {
-	AccountID  string   `json:"account_id,omitempty"`  // 多账号时指定账号，为空为默认账号
+	AccountID  string   `json:"account_id,omitempty"` // 多账号时指定账号，为空为默认账号
 	Title      string   `json:"title" binding:"required"`
 	Content    string   `json:"content" binding:"required"`
 	Images     []string `json:"images" binding:"required,min=1"`
@@ -74,10 +74,11 @@ func NewPublisher(page *rod.Page, accountID string) (*Publisher, error) {
 	currentURL := pp.MustInfo().URL
 	if strings.Contains(currentURL, "login") {
 		logrus.Info("检测到登录页面，开始登录流程", "url", currentURL)
+		logrus.Infof("accountID: %s", accountID)
 
 		// 在当前浏览器实例中执行登录（使用当前请求的 accountID 保存 cookie）
 		loginHandler := &Login{page: pp}
-		loginErr := loginHandler.Login(context.Background(), accountID)
+		loginErr := loginHandler.Login(context.WithValue(context.Background(), "accountID", accountID))
 		if loginErr != nil {
 			return nil, fmt.Errorf("发布时登录失败: %w", loginErr)
 		}

@@ -315,7 +315,12 @@ func (s *HTTPServer) checkXHSLoginStatusHandler(c *gin.Context) {
 // xhsLoginHandler XHS登录处理，accountID 通过 Header X-Account-ID 或 Query account_id 传递
 func (s *HTTPServer) xhsLoginHandler(c *gin.Context) {
 	accountID := getAccountID(c)
-	result, err := s.xhsService.Login(c.Request.Context(), accountID)
+
+	// set accountID to context
+	ctx := context.WithValue(c.Request.Context(), "accountID", accountID)
+	logrus.Infof("accountID: %s", accountID)
+	logrus.Infof("ctx: %v", ctx)
+	result, err := s.xhsService.Login(ctx)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_LOGIN_FAILED",
 			"XHS登录失败", err.Error())
