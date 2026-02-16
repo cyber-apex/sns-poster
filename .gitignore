@@ -5,6 +5,7 @@ sns-poster-*
 xhs-poster
 xhs-poster-bin
 tmp/
+cookies/
 
 # Runtime files
 cookies.json
