@@ -90,7 +90,7 @@ func (l *Login) Login(ctx context.Context, accountID string) error {
 	}
 
 	// 等待并显示二维码
-	if err := l.waitAndDisplayQRCode(pp, ctx); err != nil {
+	if err := l.waitAndDisplayQRCode(pp, ctx, accountID); err != nil {
 		return err
 	}
 
@@ -187,7 +187,7 @@ func (l *Login) triggerLoginQRCode(page *rod.Page) error {
 }
 
 // waitAndDisplayQRCode 等待并显示二维码
-func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error {
+func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context, accountID string) error {
 	qrDisplay := utils.NewQRCodeDisplay()
 
 	// 等待二维码出现
@@ -325,7 +325,7 @@ func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error 
 		logrus.Infof("二维码截图转换为data URL，大小: %d bytes", len(base64Data))
 
 		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(dataURL, ctx.Value("accountID").(string)); err != nil {
+		if err := qrDisplay.DisplayQRCode(dataURL, accountID); err != nil {
 			logrus.Warnf("显示二维码失败: %v", err)
 			// 回退到基本说明
 			// 回退到基本说明，输出简单的图片URL提示
@@ -334,7 +334,7 @@ func (l *Login) waitAndDisplayQRCode(page *rod.Page, ctx context.Context) error 
 	} else {
 		logrus.Infof("获取到二维码src: %s", (*src)[:min(100, len(*src))])
 		// 显示二维码
-		if err := qrDisplay.DisplayQRCode(*src, ctx.Value("accountID").(string)); err != nil {
+		if err := qrDisplay.DisplayQRCode(*src, accountID); err != nil {
 			logrus.Warnf("显示二维码失败: %v", err)
 		}
 
