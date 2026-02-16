@@ -48,7 +48,7 @@ func (l *Login) CheckLoginStatus(ctx context.Context) (string, error) {
 	}
 
 	if !exists {
-		return "", errors.New("not logged in")
+		return "", errors.New("未登录，请先登录")
 	}
 
 	accountIdText, err := l.getUserInfo(pp)

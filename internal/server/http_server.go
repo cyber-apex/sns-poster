@@ -258,19 +258,22 @@ func (s *HTTPServer) respondSuccess(c *gin.Context, data any, message string) {
 }
 
 // xhsAuthMiddleware XHS认证中间件 - 按请求中的 accountID 检查登录状态
+// 注意：不在中间件强制登录，让 Publisher 在发布时自动处理登录（同一浏览器会话，cookie 一致）
 func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		accountID := getAccountID(c)
 		status, err := s.xhsService.CheckLoginStatus(c.Request.Context(), accountID)
 		if err != nil {
-			s.respondError(c, http.StatusInternalServerError, "XHS_AUTH_CHECK_FAILED",
-				"无法验证XHS登录状态", err.Error())
-			c.Abort()
+			// 检查失败只记录日志，不阻止请求（Publisher 会自动处理登录）
+			logrus.Warnf("登录状态检查失败: %v，发布器将在需要时自动登录", err)
+			c.Set("xhs_is_logged_in", false)
+			c.Set("xhs_account_id", accountID)
+			c.Next()
 			return
 		}
 
 		if !status.IsLoggedIn {
-			logrus.Info("XHS用户未登录，发布器将在需要时处理登录流程")
+			logrus.Infof("账号 %s 未登录，发布器将在需要时自动处理登录流程", accountID)
 		}
 
 		c.Set("xhs_username", status.Username)

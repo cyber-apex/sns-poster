@@ -82,6 +82,7 @@ func (s *Service) isBrowserConnected() bool {
 type LoginStatusResponse struct {
 	IsLoggedIn bool   `json:"is_logged_in"`
 	Username   string `json:"username,omitempty"`
+	UserId     string `json:"user_id,omitempty"`
 }
 
 // LoginResponse 登录响应
@@ -98,7 +99,7 @@ type PublishResponse struct {
 	Status  string `json:"status"`
 }
 
-// CheckLoginStatus 检查登录状态，accountID 为空时使用默认单账号
+// CheckLoginStatus 检查登录状态
 func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*LoginStatusResponse, error) {
 	page := s.getBrowser().NewPage(accountID)
 	defer page.Close()
@@ -107,12 +108,13 @@ func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*Logi
 
 	accountIdText, err := loginAction.CheckLoginStatus(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to check login status")
 	}
 
 	response := &LoginStatusResponse{
-		IsLoggedIn: true,
+		IsLoggedIn: accountIdText != "",
 		Username:   accountIdText,
+		UserId:     accountIdText,
 	}
 
 	return response, nil

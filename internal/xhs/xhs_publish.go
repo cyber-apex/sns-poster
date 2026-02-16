@@ -73,14 +73,13 @@ func NewPublisher(page *rod.Page, accountID string) (*Publisher, error) {
 	// 检查是否重定向到登录页面
 	currentURL := pp.MustInfo().URL
 	if strings.Contains(currentURL, "login") {
-		logrus.Info("检测到登录页面，开始登录流程", "url", currentURL)
-		logrus.Infof("accountID: %s", accountID)
+		logrus.Infof("检测到登录页面，开始自动登录流程 (accountID: %s)", accountID)
 
 		// 在当前浏览器实例中执行登录（使用当前请求的 accountID 保存 cookie）
 		loginHandler := &Login{page: pp}
-		loginErr := loginHandler.Login(context.WithValue(context.Background(), "accountID", accountID))
+		loginErr := loginHandler.Login(context.Background(), accountID)
 		if loginErr != nil {
-			return nil, fmt.Errorf("发布时登录失败: %w", loginErr)
+			return nil, fmt.Errorf("发布时自动登录失败: %w", loginErr)
 		}
 
 		logrus.Info("发布时登录成功，重新导航到发布页面")
