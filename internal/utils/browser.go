@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"os/exec"
+	"sync"
 	"time"
 
 	"sns-poster/internal/config"
@@ -12,10 +13,12 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Browser 浏览器实例（多账号时按 accountID 在 NewPage 中加载对应 cookie）
+// Browser 浏览器实例，支持多账号 session 同时在线（每个账号独立 incognito context）
 type Browser struct {
 	*rod.Browser
-	launcher *launcher.Launcher
+	launcher          *launcher.Launcher
+	incognitoContexts map[string]*rod.Browser // accountID -> 独立的 incognito browser
+	contextsMux       sync.RWMutex            // 保护 incognitoContexts 的并发访问
 }
 
 // restartRodContainer 重启 Rod Docker 容器并等待其就绪
@@ -38,7 +41,8 @@ func restartRodContainer() error {
 	return nil
 }
 
-// NewPage 创建新页面并加载指定账号的 cookies。accountID 为空时使用默认单账号。
+// NewPage 创建新页面并加载指定账号的 cookies
+// 多账号时每个 accountID 使用独立的 incognito context，实现 session 隔离和共存
 func (b *Browser) NewPage(accountID string) *rod.Page {
 	// 检查浏览器连接是否有效
 	defer func() {
@@ -54,13 +58,51 @@ func (b *Browser) NewPage(accountID string) *rod.Page {
 		}
 	}()
 
-	page := b.Browser.MustPage()
+	// 获取或创建该账号的独立浏览器 context
+	browserContext := b.getOrCreateIncognitoContext(accountID)
+	
+	// 在该 context 中创建 page
+	page := browserContext.MustPage()
 
-	// 按账号加载 cookies
+	// 加载该账号的 cookies
 	cm := NewCookieManagerForAccount(accountID)
 	_ = cm.SetCookies(page)
 
+	logrus.Infof("[Browser] 为账号 %s 创建页面（独立 session）", accountID)
 	return page
+}
+
+// getOrCreateIncognitoContext 获取或创建账号的独立 incognito context
+// 每个账号有独立的 cookie 存储，实现多账号同时在线
+func (b *Browser) getOrCreateIncognitoContext(accountID string) *rod.Browser {
+	// 默认账号或空 accountID，使用主浏览器
+	if accountID == "" {
+		return b.Browser
+	}
+
+	// 读锁：检查是否已存在
+	b.contextsMux.RLock()
+	if incognito, exists := b.incognitoContexts[accountID]; exists {
+		b.contextsMux.RUnlock()
+		return incognito
+	}
+	b.contextsMux.RUnlock()
+
+	// 写锁：创建新的 incognito context
+	b.contextsMux.Lock()
+	defer b.contextsMux.Unlock()
+
+	// 双重检查（防止并发创建）
+	if incognito, exists := b.incognitoContexts[accountID]; exists {
+		return incognito
+	}
+
+	// 创建新的 incognito browser（隔离的 cookie 存储）
+	incognito := b.Browser.MustIncognito()
+	b.incognitoContexts[accountID] = incognito
+	
+	logrus.Infof("[Browser] 为账号 %s 创建独立 incognito context", accountID)
+	return incognito
 }
 
 // Close 关闭浏览器连接
@@ -119,8 +161,9 @@ func NewBrowser(cfg *config.Config) *Browser {
 		if res.browser != nil {
 			logrus.Info("浏览器连接成功")
 			return &Browser{
-				Browser:  res.browser,
-				launcher: l,
+				Browser:           res.browser,
+				launcher:          l,
+				incognitoContexts: make(map[string]*rod.Browser),
 			}
 		}
 
@@ -139,8 +182,9 @@ func NewBrowser(cfg *config.Config) *Browser {
 
 		logrus.Info("重启后浏览器连接成功")
 		return &Browser{
-			Browser:  browser,
-			launcher: l,
+			Browser:           browser,
+			launcher:          l,
+			incognitoContexts: make(map[string]*rod.Browser),
 		}
 
 	case <-connectCtx.Done():
@@ -159,8 +203,9 @@ func NewBrowser(cfg *config.Config) *Browser {
 
 		logrus.Info("重启后浏览器连接成功")
 		return &Browser{
-			Browser:  browser,
-			launcher: l,
+			Browser:           browser,
+			launcher:          l,
+			incognitoContexts: make(map[string]*rod.Browser),
 		}
 	}
 }

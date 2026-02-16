@@ -61,46 +61,28 @@ func (l *Login) CheckLoginStatus(ctx context.Context) (string, error) {
 }
 
 // Login 登录到小红书，accountID 用于保存 cookie 到该账号，为空为默认账号
-func (l *Login) Login(ctx context.Context) error {
-	accountID, ok := ctx.Value("accountID").(string)
-	if !ok {
-		return errors.New("accountID not found in context, please set accountID in context")
-	}
-	logrus.Infof("accountID: %s", accountID)
+// 多账号时每个账号在独立的 incognito context 中，session 互不干扰
+func (l *Login) Login(ctx context.Context, accountID string) error {
+	logrus.Infof("登录流程 - accountID: %s", accountID)
 	pp := l.page.Context(ctx)
-	// Cookie已经在Browser.NewPage()中自动加载
 
-	// 导航到小红书首页，这会触发二维码弹窗
+	// 导航到首页
 	pp.MustNavigate("https://www.xiaohongshu.com/explore").MustWaitLoad()
-
-	// 等待一小段时间让页面完全加载
 	time.Sleep(2 * time.Second)
 
-	// 检查是否已经登录
+	// 检查是否已登录
 	if exists, _, _ := pp.Has(".main-container .user .link-wrapper .channel"); exists {
-		logrus.Info("已经登录,查验小红书账号...")
-		accountIdText, err := l.getUserInfo(pp)
-		if err != nil {
-			return err
-		}
+		logrus.Info("已登录，保存 cookies")
 
-		if accountID != accountIdText {
-			logrus.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
-			return errors.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
-		}
-
-		logrus.Infof("小红书账号: %+v，不需要重新登录", accountIdText)
-
-		// 已经登录，保存cookies（按请求指定的账号）
 		cookieManager := utils.NewCookieManagerForAccount(accountID)
 		if err := cookieManager.SaveCookies(pp); err != nil {
-			logrus.Warnf("保存cookies失败: %v", err)
+			logrus.Warnf("保存 cookies 失败: %v", err)
 		}
 		return nil
 	}
 
-	// 需要登录，寻找登录按钮
-	logrus.Info("检测到未登录，开始登录流程...")
+	// 未登录，开始登录流程
+	logrus.Info("未登录，开始登录流程...")
 
 	// 尝试点击登录按钮触发二维码
 	if err := l.triggerLoginQRCode(pp); err != nil {
@@ -117,26 +99,13 @@ func (l *Login) Login(ctx context.Context) error {
 		return err
 	}
 
-	// 通过接口获取用户信息
-	accountIdText, err := l.getUserInfo(pp)
-	if err != nil {
-		return err
-	}
-
-	logrus.Infof("登录成功，小红书账号: %+v", accountIdText)
-
-	if accountID != accountIdText {
-		logrus.Errorf("登录账号与请求账号不匹配: %s != %s", accountID, accountIdText)
-		return errors.New("登录账号与请求账号不匹配")
-	}
-
-	// 保存cookies（按请求指定的账号）
+	// 登录成功，保存 cookies
 	cookieManager := utils.NewCookieManagerForAccount(accountID)
 	if err := cookieManager.SaveCookies(pp); err != nil {
-		logrus.Warnf("保存cookies失败: %v", err)
+		return errors.Wrap(err, "保存 cookies 失败")
 	}
 
-	logrus.Info("登录成功！")
+	logrus.Infof("登录成功 - accountID: %s", accountID)
 	return nil
 }
 

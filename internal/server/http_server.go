@@ -169,12 +169,15 @@ func (s *HTTPServer) corsMiddleware() gin.HandlerFunc {
 	}
 }
 
-// getAccountID 从请求中读取 accountID：优先 Header X-Account-ID，其次 Query account_id
+// getAccountID 从请求中读取 accountID：优先 Query account_id，其次 Header X-Account-ID
+// 如果都没有，返回空字符串（使用默认账号 cookies.json）
 func getAccountID(c *gin.Context) string {
-	if v := c.GetHeader("X-Account-ID"); v != "" {
+	// 优先级 1: Query String (最高优先级)
+	if v := c.Query("account_id"); v != "" {
 		return v
 	}
-	if v := c.Query("account_id"); v != "" {
+	// 优先级 2: Header
+	if v := c.GetHeader("X-Account-ID"); v != "" {
 		return v
 	}
 
@@ -261,11 +264,15 @@ func (s *HTTPServer) respondSuccess(c *gin.Context, data any, message string) {
 // 注意：不在中间件强制登录，让 Publisher 在发布时自动处理登录（同一浏览器会话，cookie 一致）
 func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// 从 Header/Query 读取 accountID（body 还未解析）
 		accountID := getAccountID(c)
+
+		logrus.Infof("[Middleware] 检查账号登录状态: %s", accountID)
+
 		status, err := s.xhsService.CheckLoginStatus(c.Request.Context(), accountID)
 		if err != nil {
 			// 检查失败只记录日志，不阻止请求（Publisher 会自动处理登录）
-			logrus.Warnf("登录状态检查失败: %v，发布器将在需要时自动登录", err)
+			logrus.Warnf("[Middleware] 登录状态检查失败: %v，发布器将自动处理", err)
 			c.Set("xhs_is_logged_in", false)
 			c.Set("xhs_account_id", accountID)
 			c.Next()
@@ -273,10 +280,12 @@ func (s *HTTPServer) xhsAuthMiddleware() gin.HandlerFunc {
 		}
 
 		if !status.IsLoggedIn {
-			logrus.Infof("账号 %s 未登录，发布器将在需要时自动处理登录流程", accountID)
+			logrus.Infof("[Middleware] 账号 %s 未登录，发布器将自动登录", accountID)
+		} else {
+			logrus.Infof("[Middleware] 账号 %s 已登录", accountID)
 		}
 
-		c.Set("xhs_username", status.Username)
+		// 保存 middleware 检查的账号信息到 context
 		c.Set("xhs_is_logged_in", status.IsLoggedIn)
 		c.Set("xhs_account_id", accountID)
 		c.Next()
@@ -324,12 +333,9 @@ func (s *HTTPServer) checkXHSLoginStatusHandler(c *gin.Context) {
 // xhsLoginHandler XHS登录处理，accountID 通过 Header X-Account-ID 或 Query account_id 传递
 func (s *HTTPServer) xhsLoginHandler(c *gin.Context) {
 	accountID := getAccountID(c)
+	logrus.Infof("登录请求，accountID: %s", accountID)
 
-	// set accountID to context
-	ctx := context.WithValue(c.Request.Context(), "accountID", accountID)
-	logrus.Infof("accountID: %s", accountID)
-	logrus.Infof("ctx: %v", ctx)
-	result, err := s.xhsService.Login(ctx)
+	result, err := s.xhsService.Login(c.Request.Context(), accountID)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_LOGIN_FAILED",
 			"XHS登录失败", err.Error())
@@ -372,12 +378,25 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 			"请求参数错误", err.Error())
 		return
 	}
-	if req.AccountID == "" {
+
+	// 优先使用 middleware 已验证的 accountID，确保一致性
+	middlewareAccountID, exists := c.Get("xhs_account_id")
+	if exists && middlewareAccountID != nil {
+		middlewareAccIDStr := middlewareAccountID.(string)
+		// 如果 body 有 account_id 且与 middleware 不同，以 body 为准（但需要记录警告）
+		if req.AccountID != "" && req.AccountID != middlewareAccIDStr {
+			logrus.Warnf("⚠️  账号不一致！Middleware: %s, Body: %s，使用 Body 的值",
+				middlewareAccIDStr, req.AccountID)
+		} else if req.AccountID == "" {
+			// Body 没有 account_id，使用 middleware 的
+			req.AccountID = middlewareAccIDStr
+		}
+	} else if req.AccountID == "" {
+		// Middleware 和 Body 都没有，从 Header/Query 读取
 		req.AccountID = getAccountID(c)
 	}
 
-	username, _ := c.Get("xhs_username")
-	logrus.Infof("XHS用户 %v 请求发布内容: %s", username, req.Title)
+	logrus.Infof("[Handler] 发布请求 - AccountID: %s, Title: %s", req.AccountID, req.Title)
 
 	result, err := s.xhsService.PublishContent(c.Request.Context(), &req)
 	if err != nil {
@@ -386,6 +405,6 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 		return
 	}
 
-	logrus.Infof("XHS用户 %v 发布内容成功: %s", username, req.Title)
+	logrus.Infof("[Handler] 发布成功 - AccountID: %s, Title: %s", req.AccountID, req.Title)
 	s.respondSuccess(c, result, "XHS发布成功")
 }

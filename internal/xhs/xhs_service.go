@@ -121,11 +121,7 @@ func (s *Service) CheckLoginStatus(ctx context.Context, accountID string) (*Logi
 }
 
 // Login 登录到小红书，accountID 为空时使用默认单账号
-func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
-	accountID, ok := ctx.Value("accountID").(string)
-	if !ok {
-		return nil, errors.New("accountID not found in context")
-	}
+func (s *Service) Login(ctx context.Context, accountID string) (*LoginResponse, error) {
 	logrus.Infof("登录小红书账号: %s", accountID)
 
 	page := s.getBrowser().NewPage(accountID)
@@ -133,7 +129,7 @@ func (s *Service) Login(ctx context.Context) (*LoginResponse, error) {
 
 	loginAction := NewLogin(page)
 
-	err := loginAction.Login(ctx)
+	err := loginAction.Login(ctx, accountID)
 	if err != nil {
 		logrus.Errorf("登录小红书账号 %s 失败: %v", accountID, err)
 		return &LoginResponse{
