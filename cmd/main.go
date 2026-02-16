@@ -102,8 +102,29 @@ func gracefulShutdown(httpServer *server.HTTPServer, xhsService *xhs.Service) {
 
 // logServerStartupInfo 显示服务器启动信息
 func logServerStartupInfo() {
-	logrus.Info("========================================")
-	logrus.Info("🚀 SNS Poster HTTP服务已启动")
-	logrus.Info("========================================")
-	logrus.Info("📡 HTTP API: http://localhost:6170")
+	banner := `
+ ___________________________________________
+/ SNS Poster Service Started                \
+|                                           |
+| XiaoHongShu Content Publishing Service    |
+| Multi-account Support Enabled             |
+\ HTTP API: http://localhost:6170          /
+ -------------------------------------------
+        \   ^__^
+         \  (oo)\_______
+            (__)\       )\/\
+                ||----w |
+                ||     ||
+
+API Endpoints:
+   - POST   /api/v1/xhs/login          - Login
+   - GET    /api/v1/xhs/login/status   - Check login status
+   - POST   /api/v1/xhs/publish        - Publish content (auto-login)
+   - POST   /api/v1/xhs/logout         - Logout
+   - GET    /health                    - Health check
+
+Multi-account: Use Header X-Account-ID or Query/Body account_id
+Press Ctrl+C to shutdown gracefully
+`
+	logrus.Info(banner)
 }
