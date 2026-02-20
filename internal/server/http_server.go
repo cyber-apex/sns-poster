@@ -430,7 +430,10 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 	logrus.Infof("[Handler] 发布成功 - AccountID: %s, Title: %s", req.AccountID, req.Title)
 
 	// 将发布记录添加到set中
-	s.redisClient.SAdd(c.Request.Context(), redisKey, req.URL)
+	_, err = s.redisClient.SAdd(c.Request.Context(), redisKey, redisValue).Result()
+	if err != nil {
+		logrus.Warnf("Redis添加发布记录失败: %v", err)
+	}
 
 	s.respondSuccess(c, result, "XHS发布成功")
 }
