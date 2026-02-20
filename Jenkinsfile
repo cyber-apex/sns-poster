@@ -156,7 +156,7 @@ pipeline {
             echo '✅ SNS Poster Pipeline completed successfully!'
             
             // Archive build artifacts
-            archiveArtifacts artifacts: 'bin/sns-poster-linux-amd64', fingerprint: true
+            // archiveArtifacts artifacts: 'bin/sns-poster-linux-amd64', fingerprint: true
             
             // Notify on success (configure as needed)
             script {
