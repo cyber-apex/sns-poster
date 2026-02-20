@@ -431,11 +431,6 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 
 	// 将发布记录添加到set中
 	s.redisClient.SAdd(c.Request.Context(), redisKey, req.URL)
-	if err != nil {
-		s.respondError(c, http.StatusInternalServerError, "REDIS_ADD_FAILED",
-			"Redis添加失败", err.Error())
-		return
-	}
 
 	s.respondSuccess(c, result, "XHS发布成功")
 }
