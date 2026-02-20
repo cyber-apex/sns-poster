@@ -6,6 +6,7 @@ xhs-poster
 xhs-poster-bin
 tmp/
 cookies/
+.env*
 
 # Runtime files
 cookies.json
