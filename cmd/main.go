@@ -6,13 +6,15 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"syscall"
-	"time"
-
 	"sns-poster/internal/config"
 	"sns-poster/internal/logger"
 	"sns-poster/internal/server"
 	"sns-poster/internal/xhs"
+	"syscall"
+	"time"
+
+	"github.com/go-redis/redis/v8"
+	"github.com/joho/godotenv"
 
 	"github.com/sirupsen/logrus"
 )
@@ -37,11 +39,23 @@ func main() {
 	// 初始化配置（accountID 由各 HTTP 请求 / 消息携带，不在此指定）
 	cfg := &config.Config{}
 
+	// 加载环境变量
+	if err := godotenv.Load(); err != nil {
+		log.Fatalf("加载环境变量失败: %v", err)
+	}
+
+	// 初始化Redis客户端
+	redisClient := redis.NewClient(&redis.Options{
+		Addr:     os.Getenv("REDIS_ADDRESS"),
+		Password: os.Getenv("REDIS_PASSWORD"),
+		DB:       0,
+	})
+
 	// 延迟初始化小红书服务，避免rod在flag.Parse()之前注册标志
 	xhsService := initializeServices(cfg)
 
 	// 创建HTTP服务器
-	httpServer := server.NewHTTPServer(xhsService)
+	httpServer := server.NewHTTPServer(xhsService, redisClient)
 
 	// 设置信号处理
 	quit := make(chan os.Signal, 1)

@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,20 +12,23 @@ import (
 	"sns-poster/internal/xhs"
 
 	"github.com/gin-gonic/gin"
+	"github.com/go-redis/redis/v8"
 	"github.com/sirupsen/logrus"
 )
 
 // HTTPServer HTTP服务器
 type HTTPServer struct {
-	xhsService *xhs.Service
-	router     *gin.Engine
-	server     *http.Server
+	xhsService  *xhs.Service
+	redisClient *redis.Client
+	router      *gin.Engine
+	server      *http.Server
 }
 
 // NewHTTPServer 创建HTTP服务器
-func NewHTTPServer(xhsService *xhs.Service) *HTTPServer {
+func NewHTTPServer(xhsService *xhs.Service, redisClient *redis.Client) *HTTPServer {
 	return &HTTPServer{
-		xhsService: xhsService,
+		xhsService:  xhsService,
+		redisClient: redisClient,
 	}
 }
 
@@ -398,6 +402,24 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 
 	logrus.Infof("[Handler] 发布请求 - AccountID: %s, Title: %s", req.AccountID, req.Title)
 
+	// 在redis中检查是否存在该账号的发布记录
+	redisKey := fmt.Sprintf("%s:%s:%v", os.Getenv("SNS_POSTER_QUEUE_NAME"), req.AccountID, "success")
+	redisValue := req.URL
+
+	// 检查是否在set中存在该账号的发布记录
+	exists, err := s.redisClient.SIsMember(c.Request.Context(), redisKey, redisValue).Result()
+
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, "REDIS_CHECK_FAILED",
+			"Redis检查失败", err.Error())
+		return
+	}
+	if exists {
+		s.respondError(c, http.StatusBadRequest, "TITLE_ALREADY_PUBLISHED",
+			fmt.Sprintf("该标题已存在发布记录: %s", redisValue), nil)
+		return
+	}
+
 	result, err := s.xhsService.PublishContent(c.Request.Context(), &req)
 	if err != nil {
 		s.respondError(c, http.StatusInternalServerError, "XHS_PUBLISH_FAILED",
@@ -406,5 +428,14 @@ func (s *HTTPServer) xhsPublishHandler(c *gin.Context) {
 	}
 
 	logrus.Infof("[Handler] 发布成功 - AccountID: %s, Title: %s", req.AccountID, req.Title)
+
+	// 将发布记录添加到set中
+	s.redisClient.SAdd(c.Request.Context(), redisKey, req.URL)
+	if err != nil {
+		s.respondError(c, http.StatusInternalServerError, "REDIS_ADD_FAILED",
+			"Redis添加失败", err.Error())
+		return
+	}
+
 	s.respondSuccess(c, result, "XHS发布成功")
 }
