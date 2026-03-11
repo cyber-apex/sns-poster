@@ -172,10 +172,26 @@ func (s *Service) filterSensitiveWordsByRegex(content string) string {
 	regexPatterns := []string{
 		// 正则表达式过滤超链接
 		"https?://[^\\s]+",
+		"我的英雄学院",
 	}
 
 	re := regexp.MustCompile(strings.Join(regexPatterns, "|"))
 	return re.ReplaceAllString(content, "***")
+}
+
+// filterOutSensitiveWords 过滤内容中的敏感词
+// 如果标题包含敏感词，取消发布，并返回错误
+func (s *Service) filterOutSensitiveTitle(content string) error {
+	sensitiveWords := []string{
+		"我的英雄学院",
+	}
+
+	for _, word := range sensitiveWords {
+		if strings.Contains(content, word) {
+			return fmt.Errorf("标题包含敏感词: %s, 取消发布", word)
+		}
+	}
+	return nil
 }
 
 // PublishContent 发布内容
@@ -191,6 +207,10 @@ func (s *Service) PublishContent(ctx context.Context, req *PublishContent) (*Pub
 
 		logrus.Infof("截取完成: %d字符 -> %d字符", originalWidth, runewidth.StringWidth(req.Title))
 		logrus.Infof("截取后的标题: %s", req.Title)
+	}
+
+	if err := s.filterOutSensitiveTitle(req.Title); err != nil {
+		return nil, err
 	}
 
 	// 自动截取内容长度 - 小红书限制：最大2000个字符
