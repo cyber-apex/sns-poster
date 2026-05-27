@@ -244,12 +244,14 @@ func (p *Publisher) submitPublish(page *rod.Page, title, content string, tags []
 
 	time.Sleep(1 * time.Second)
 
-	submitButton, err := page.ElementR("button", "发布")
-
+	submitShadowRoot, err := page.MustElement("xhs-publish-btn").ShadowRoot()
+	if err != nil {
+		return fmt.Errorf("[提交发布] 查找阴影根元素失败: %w", err)
+	}
+	submitButton, err := submitShadowRoot.ElementR("button", "发布")
 	if err != nil {
 		return fmt.Errorf("[提交发布] 查找提交按钮失败: %w", err)
 	}
-
 	submitButton.MustClick()
 
 	return p.waitPublishComplete(page)
