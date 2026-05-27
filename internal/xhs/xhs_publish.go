@@ -244,7 +244,11 @@ func (p *Publisher) submitPublish(page *rod.Page, title, content string, tags []
 
 	time.Sleep(1 * time.Second)
 
-	submitButton := page.MustElement("div.publish-page-publish-btn button.d-button:last-child")
+	submitButton, err := page.Element("div.publish-page-publish-btn button:last-child")
+
+	if err != nil {
+		return fmt.Errorf("[提交发布] 查找提交按钮失败: %w", err)
+	}
 
 	submitButton.MustClick()
 
